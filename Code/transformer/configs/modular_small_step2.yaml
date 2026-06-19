@@ -81,3 +81,7 @@ targets:
   penalty_lambdas:
   - 0.2
   - 0.3
+
+protocol:
+  adaptation_replicates: 3
+  sweep_replicates: 1

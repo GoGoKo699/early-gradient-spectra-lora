@@ -11,7 +11,8 @@ import pandas as pd
 def plot_rank_sweeps(metrics: pd.DataFrame, out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8, 5))
-    for site, g in metrics.groupby("site_name"):
+    collapsed = metrics.groupby(["site_name", "rank"], as_index=False).agg(final_val_loss=("final_val_loss", "mean"))
+    for site, g in collapsed.groupby("site_name"):
         h = g.sort_values("rank")
         ax.plot(h["rank"], h["final_val_loss"], marker="o", label=site.split(".")[-1] + ":" + site.split(".")[1] if "." in site else site)
     ax.set_xscale("symlog", base=2, linthresh=1)
@@ -44,7 +45,8 @@ def plot_prediction_scatter(targets: pd.DataFrame, stats: pd.DataFrame, out: Pat
 def plot_budget_curve(results: pd.DataFrame, out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(7, 5))
-    for rule, g in results.groupby("rule"):
+    collapsed = results.groupby(["rule", "budget"], as_index=False).agg(final_val_loss=("final_val_loss", "mean"))
+    for rule, g in collapsed.groupby("rule"):
         h = g.sort_values("budget")
         ax.plot(h["budget"], h["final_val_loss"], marker="o", label=rule)
     ax.set_xlabel("parameter budget")

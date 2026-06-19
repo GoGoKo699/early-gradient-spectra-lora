@@ -46,13 +46,18 @@ def make_task_spec(cfg: Dict, split: str) -> TaskSpec:
     raise ValueError(f"unknown task name: {name}")
 
 
-def batch_modular(spec: TaskSpec, batch_size: int, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+def batch_modular(
+    spec: TaskSpec,
+    batch_size: int,
+    device: torch.device,
+    generator: torch.Generator | None = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     p = int(spec.params["modulus"])
     offset = int(spec.params["offset"])
     plus = p
     eq = p + 1
-    a = torch.randint(0, p, (batch_size,), device=device)
-    b = torch.randint(0, p, (batch_size,), device=device)
+    a = torch.randint(0, p, (batch_size,), device=device, generator=generator)
+    b = torch.randint(0, p, (batch_size,), device=device, generator=generator)
     x = torch.empty((batch_size, spec.seq_len), dtype=torch.long, device=device)
     x[:, 0] = a
     x[:, 1] = plus
@@ -63,16 +68,21 @@ def batch_modular(spec: TaskSpec, batch_size: int, device: torch.device) -> Tupl
     return x, y
 
 
-def batch_associative(spec: TaskSpec, batch_size: int, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+def batch_associative(
+    spec: TaskSpec,
+    batch_size: int,
+    device: torch.device,
+    generator: torch.Generator | None = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     k = int(spec.params["num_keys"])
     num_pairs = int(spec.params.get("num_pairs", 4))
     shift = int(spec.params["shift"])
     x = torch.empty((batch_size, spec.seq_len), dtype=torch.long, device=device)
     y = torch.full_like(x, IGNORE_INDEX)
     for b in range(batch_size):
-        keys = torch.randperm(k, device=device)[:num_pairs]
+        keys = torch.randperm(k, device=device, generator=generator)[:num_pairs]
         values = k + ((keys + shift) % k)
-        query_idx = torch.randint(0, num_pairs, (1,), device=device).item()
+        query_idx = torch.randint(0, num_pairs, (1,), device=device, generator=generator).item()
         query_key = keys[query_idx]
         for i in range(num_pairs):
             x[b, 2 * i] = keys[i]
@@ -82,9 +92,19 @@ def batch_associative(spec: TaskSpec, batch_size: int, device: torch.device) -> 
     return x, y
 
 
-def make_batch(spec: TaskSpec, batch_size: int, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+def make_batch(
+    spec: TaskSpec,
+    batch_size: int,
+    device: torch.device,
+    generator: torch.Generator | None = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Draw one task batch, optionally from an explicit RNG stream.
+
+    Passing a generator is required for publication comparisons so that data
+    randomness is independent of model/adaptor/dropout randomness.
+    """
     if spec.name == "modular":
-        return batch_modular(spec, batch_size, device)
+        return batch_modular(spec, batch_size, device, generator=generator)
     if spec.name == "associative_recall":
-        return batch_associative(spec, batch_size, device)
+        return batch_associative(spec, batch_size, device, generator=generator)
     raise ValueError(spec.name)

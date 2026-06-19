@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, Mapping, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+LoraInitBank = Dict[str, Tuple[torch.Tensor, torch.Tensor]]
 
 
 class LoRALinear(nn.Module):
@@ -28,15 +30,52 @@ class LoRALinear(nn.Module):
             bound = fan_in ** -0.5
             nn.init.uniform_(self.bias, -bound, bound)
 
-    def set_lora(self, rank: int, alpha: float = 1.0, init_scale: float = 0.01) -> None:
+    def set_lora(
+        self,
+        rank: int,
+        alpha: float = 1.0,
+        init_scale: float = 0.01,
+        *,
+        a_init: torch.Tensor | None = None,
+        b_init: torch.Tensor | None = None,
+    ) -> None:
         self.rank = int(rank)
         self.alpha = float(alpha)
-        if self.rank > 0:
-            self.lora_A = nn.Parameter(init_scale * torch.randn(self.rank, self.in_features, device=self.weight.device, dtype=self.weight.dtype))
-            self.lora_B = nn.Parameter(torch.zeros(self.out_features, self.rank, device=self.weight.device, dtype=self.weight.dtype))
-        else:
+        if self.rank <= 0:
             self.lora_A = None
             self.lora_B = None
+            return
+
+        if a_init is None:
+            a = init_scale * torch.randn(
+                self.rank,
+                self.in_features,
+                device=self.weight.device,
+                dtype=self.weight.dtype,
+            )
+        else:
+            if a_init.ndim != 2 or a_init.shape[0] < self.rank or a_init.shape[1] != self.in_features:
+                raise ValueError(
+                    f"invalid A initialization {tuple(a_init.shape)} for rank={self.rank}, in={self.in_features}"
+                )
+            a = a_init[: self.rank].detach().to(device=self.weight.device, dtype=self.weight.dtype).clone()
+
+        if b_init is None:
+            b = torch.zeros(
+                self.out_features,
+                self.rank,
+                device=self.weight.device,
+                dtype=self.weight.dtype,
+            )
+        else:
+            if b_init.ndim != 2 or b_init.shape[0] != self.out_features or b_init.shape[1] < self.rank:
+                raise ValueError(
+                    f"invalid B initialization {tuple(b_init.shape)} for out={self.out_features}, rank={self.rank}"
+                )
+            b = b_init[:, : self.rank].detach().to(device=self.weight.device, dtype=self.weight.dtype).clone()
+
+        self.lora_A = nn.Parameter(a)
+        self.lora_B = nn.Parameter(b)
 
     def clear_lora(self) -> None:
         self.rank = 0
@@ -167,11 +206,60 @@ def enable_base_training(model: nn.Module) -> None:
         p.requires_grad_(True)
 
 
-def set_lora_ranks(model: nn.Module, ranks: Dict[str, int], alpha: float, init_scale: float = 0.01) -> None:
+def make_lora_init_bank(
+    model: nn.Module,
+    max_rank: int,
+    seed: int,
+    init_scale: float = 0.01,
+) -> LoraInitBank:
+    """Create per-module maximum-rank tensors for nested rank comparisons.
+
+    Every lower-rank condition receives a prefix slice of the same maximum-rank
+    matrices, so changing rank does not also redraw the shared coordinates.
+    The bank is kept on CPU and copied into each cloned model.
+    """
+    max_rank = int(max_rank)
+    if max_rank < 0:
+        raise ValueError("max_rank must be non-negative")
+    generator = torch.Generator(device="cpu")
+    generator.manual_seed(int(seed))
+    bank: LoraInitBank = {}
+    for name, module in iter_lora_modules(model):
+        a = init_scale * torch.randn(
+            max_rank,
+            module.in_features,
+            generator=generator,
+            dtype=torch.float32,
+        )
+        b = torch.zeros(module.out_features, max_rank, dtype=torch.float32)
+        bank[name] = (a, b)
+    return bank
+
+
+def set_lora_ranks(
+    model: nn.Module,
+    ranks: Mapping[str, int],
+    alpha: float,
+    init_scale: float = 0.01,
+    *,
+    init_bank: Mapping[str, Tuple[torch.Tensor, torch.Tensor]] | None = None,
+) -> None:
     clear_all_lora(model)
     for name, module in iter_lora_modules(model):
         r = int(ranks.get(name, 0))
-        module.set_lora(r, alpha=alpha, init_scale=init_scale)
+        if init_bank is None or r <= 0:
+            module.set_lora(r, alpha=alpha, init_scale=init_scale)
+        else:
+            if name not in init_bank:
+                raise KeyError(f"missing LoRA initialization for module {name}")
+            a_init, b_init = init_bank[name]
+            module.set_lora(
+                r,
+                alpha=alpha,
+                init_scale=init_scale,
+                a_init=a_init,
+                b_init=b_init,
+            )
 
 
 def lora_parameters(model: nn.Module):

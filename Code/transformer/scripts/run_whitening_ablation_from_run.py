@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import json
 from pathlib import Path
 import sys
 from typing import Dict, Mapping
@@ -24,11 +25,15 @@ from strank.allocation import (
     uniform_fill_allocation,
 )
 from strank.calibrate import calibrate_module_spectra
-from strank.model import build_model, clear_all_lora, set_lora_ranks
+from strank.model import build_model, clear_all_lora, make_lora_init_bank, set_lora_ranks
 from strank.tasks import make_task_spec
-from strank.train import train_lora
+from strank.train import materialize_batches, train_lora
 from strank.utils import get_device, load_yaml, make_run_dir, save_yaml, set_seed, stable_seed
 
+
+
+def _task_key(task) -> str:
+    return json.dumps({"name": task.name, "params": task.params}, sort_keys=True, separators=(",", ":"))
 
 
 def _clone_base(base_state: Mapping[str, torch.Tensor], vocab_size: int, seq_len: int, model_cfg: Dict, device: torch.device):
@@ -78,16 +83,21 @@ def _calibrate_all(
     stats_by_w: Dict[str, pd.DataFrame] = {}
     sv_by_w: Dict[str, Dict[str, np.ndarray]] = {}
     all_rows = []
-    for wi, whitening in enumerate(whitenings):
+    calibration_data_seed = stable_seed(seed, _task_key(adapt_task), "whitening_ablation", "calibration_data")
+    permutation_seed = stable_seed(seed, _task_key(adapt_task), "whitening_ablation", "calibration_null")
+    for whitening in whitenings:
         print(f"calibration whitening={whitening}", flush=True)
         model = _clone_base(base_state, vocab_size, seq_len, cfg["model"], device)
         cal_cfg = copy.deepcopy(cfg["calibration"])
         cal_cfg["whitening"] = whitening
-        # Use identical calibration batches for every whitening condition.
-        set_seed(seed + 424242)
-        rows, svs = calibrate_module_spectra(model, adapt_task, cal_cfg, sites, device, seed=seed + 1000 * (wi + 1))
+        # Both calibration examples and null permutations are shared across
+        # whitening conditions, so whitening is the only changing factor.
+        set_seed(calibration_data_seed)
+        rows, svs = calibrate_module_spectra(model, adapt_task, cal_cfg, sites, device, seed=permutation_seed)
         for r in rows:
             r["whitening_ablation"] = whitening
+            r["calibration_data_seed"] = int(calibration_data_seed)
+            r["permutation_seed"] = int(permutation_seed)
         df = pd.DataFrame(rows)
         stats_by_w[whitening] = df
         sv_by_w[whitening] = svs
@@ -120,6 +130,20 @@ def _alloc_for_rule(rule: str, stats: pd.DataFrame, svs: Dict[str, np.ndarray], 
     raise ValueError(f"unknown rule: {rule}")
 
 
+def _seed_bundle(comparison_seed: int) -> dict[str, int]:
+    return {
+        "comparison_seed": int(comparison_seed),
+        "adapter_seed": int(stable_seed(comparison_seed, "adapter_init")),
+        "train_data_seed": int(stable_seed(comparison_seed, "train_data")),
+        "eval_data_seed": int(stable_seed(comparison_seed, "eval_data")),
+        "dropout_seed": int(stable_seed(comparison_seed, "dropout")),
+    }
+
+
+def _allocation_signature(alloc: Mapping[str, int]) -> str:
+    return "|".join(f"{name}:{int(rank)}" for name, rank in sorted(alloc.items()))
+
+
 def _budget_ablation(
     cfg: Dict,
     adapt_task,
@@ -136,56 +160,106 @@ def _budget_ablation(
 ):
     rank_grid = [int(x) for x in cfg["lora"]["ranks"]]
     budgets = [int(x) for x in cfg.get("budgets", {}).get("param_budgets", [])]
+    adaptation_replicates = int(cfg.get("protocol", {}).get("adaptation_replicates", 1))
+    if adaptation_replicates < 1:
+        raise ValueError("protocol.adaptation_replicates must be at least 1")
     baseline_stats = stats_by_w["none"] if "none" in stats_by_w else next(iter(stats_by_w.values()))
     baseline_svs = sv_by_w["none"] if "none" in sv_by_w else next(iter(sv_by_w.values()))
     rows = []
     alloc_rows = []
 
-    # Baselines independent of whitening.
     rule_specs = [("baseline", "uniform_fill", baseline_stats, baseline_svs, "uniform_fill")]
     rule_specs.append(("baseline", "gradient_norm", baseline_stats, baseline_svs, "gradient_norm"))
     for w in whitenings:
         for rule in spectral_rules:
             rule_specs.append((w, rule, stats_by_w[w], sv_by_w[w], f"{w}_{rule}"))
 
+    lora_cfg = cfg["lora"]
+    max_rank = max(rank_grid or [0])
+    init_scale = float(lora_cfg.get("init_scale", 0.01))
+    bs = int(adapt_task.params.get("train_batch_size", lora_cfg.get("batch_size", 64)))
+    steps = int(lora_cfg.get("steps", 100))
+    eval_count = int(adapt_task.params.get("eval_batches", 4))
+
     for budget in budgets:
+        prepared = []
         for whitening, rule, stats, svs, label in rule_specs:
             alloc = _alloc_for_rule(rule, stats, svs, rank_grid, budget)
-            cost = allocation_cost(stats, alloc)
-            print(f"ablation budget={budget} label={label} cost={cost} alloc={alloc}", flush=True)
-            set_seed(stable_seed(seed, "whitening_ablation", budget, label))
-            model = _clone_base(base_state, vocab_size, seq_len, cfg["model"], device)
-            set_lora_ranks(model, alloc, alpha=float(cfg["lora"].get("alpha", 8.0)))
-            metrics, diverged = train_lora(model, adapt_task, cfg["lora"], device, eval_task=adapt_task)
-            rows.append({
-                "label": label,
-                "rule": rule,
-                "whitening": whitening,
-                "budget": budget,
-                "actual_cost": cost,
-                "diverged": bool(diverged),
-                "final_train_loss": metrics["train_loss_last"],
-                "final_val_loss": metrics["val_loss"],
-                "final_val_accuracy": metrics["val_accuracy"],
-                "trainable_params": metrics["trainable_params"],
-            })
-            for site, rank in alloc.items():
-                alloc_rows.append({
+            prepared.append((whitening, rule, stats, label, alloc, allocation_cost(stats, alloc)))
+        for replicate in range(adaptation_replicates):
+            # The condition label is intentionally absent from this seed.
+            comparison_seed = stable_seed(seed, _task_key(adapt_task), "whitening_ablation", budget, replicate)
+            seeds = _seed_bundle(comparison_seed)
+            template = _clone_base(base_state, vocab_size, seq_len, cfg["model"], device)
+            init_bank = make_lora_init_bank(template, max_rank, seeds["adapter_seed"], init_scale=init_scale)
+            train_batches = materialize_batches(adapt_task, bs, steps, device, seeds["train_data_seed"])
+            validation_batches = materialize_batches(adapt_task, bs, eval_count, device, seeds["eval_data_seed"])
+            for whitening, rule, stats, label, alloc, cost in prepared:
+                signature = _allocation_signature(alloc)
+                print(f"ablation budget={budget} replicate={replicate} label={label} cost={cost} alloc={alloc}", flush=True)
+                model = _clone_base(base_state, vocab_size, seq_len, cfg["model"], device)
+                set_lora_ranks(
+                    model,
+                    alloc,
+                    alpha=float(lora_cfg.get("alpha", 8.0)),
+                    init_scale=init_scale,
+                    init_bank=init_bank,
+                )
+                metrics, diverged = train_lora(
+                    model,
+                    adapt_task,
+                    lora_cfg,
+                    device,
+                    eval_task=adapt_task,
+                    train_batches=train_batches,
+                    validation_batches=validation_batches,
+                    dropout_seed=seeds["dropout_seed"],
+                )
+                rows.append({
+                    "protocol_version": "common_random_numbers_v1",
+                    "condition_seed": int(comparison_seed),
+                    "adaptation_replicate": int(replicate),
+                    **seeds,
                     "label": label,
                     "rule": rule,
                     "whitening": whitening,
                     "budget": budget,
-                    "site_name": site,
-                    "rank": int(rank),
                     "actual_cost": cost,
+                    "allocation_signature": signature,
+                    "diverged": bool(diverged),
+                    "final_train_loss": metrics["train_loss_last"],
+                    "final_val_loss": metrics["val_loss"],
+                    "final_val_accuracy": metrics["val_accuracy"],
+                    "trainable_params": metrics["trainable_params"],
                 })
+                for site, rank in alloc.items():
+                    alloc_rows.append({
+                        "protocol_version": "common_random_numbers_v1",
+                        "condition_seed": int(comparison_seed),
+                        "adaptation_replicate": int(replicate),
+                        **seeds,
+                        "label": label,
+                        "rule": rule,
+                        "whitening": whitening,
+                        "budget": budget,
+                        "site_name": site,
+                        "rank": int(rank),
+                        "actual_cost": cost,
+                        "allocation_signature": signature,
+                    })
     out_dir = run_dir / "budget"
     out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(rows)
     ar = pd.DataFrame(alloc_rows)
+    atol = 1e-6 if device.type == "cuda" else 1e-10
+    for _, group in df.groupby(["budget", "adaptation_replicate", "allocation_signature"]):
+        if len(group) > 1:
+            for metric in ["final_train_loss", "final_val_loss", "final_val_accuracy"]:
+                values = group[metric].to_numpy(dtype=float)
+                if float(values.max() - values.min()) > atol:
+                    raise RuntimeError(f"identical-allocation CRN invariant failed for {metric}: {group['label'].tolist()}")
     df.to_csv(out_dir / "whitening_ablation_results.csv", index=False)
     ar.to_csv(out_dir / "whitening_ablation_allocations.csv", index=False)
-    # Also write budget_results.csv so existing summary tooling can inspect the run.
     budget_view = df.rename(columns={"rule": "allocation_rule", "label": "rule"})
     budget_view.to_csv(out_dir / "budget_results.csv", index=False)
     return df, ar
@@ -195,9 +269,10 @@ def _summarize_and_plot(df: pd.DataFrame, run_dir: Path) -> None:
     out_dir = run_dir / "budget"
     fig_dir = run_dir / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
-    base = df[df["label"] == "uniform_fill"][["budget", "final_val_loss", "final_val_accuracy"]]
+    pair_keys = ["budget", "adaptation_replicate"]
+    base = df[df["label"] == "uniform_fill"][pair_keys + ["final_val_loss", "final_val_accuracy"]]
     base = base.rename(columns={"final_val_loss": "uniform_fill_loss", "final_val_accuracy": "uniform_fill_acc"})
-    merged = df.merge(base, on="budget", how="left")
+    merged = df.merge(base, on=pair_keys, how="left", validate="many_to_one")
     merged["loss_delta_vs_uniform_fill"] = merged["final_val_loss"] - merged["uniform_fill_loss"]
     merged["acc_delta_vs_uniform_fill"] = merged["final_val_accuracy"] - merged["uniform_fill_acc"]
     merged.to_csv(out_dir / "whitening_ablation_deltas.csv", index=False)
@@ -206,15 +281,16 @@ def _summarize_and_plot(df: pd.DataFrame, run_dir: Path) -> None:
         median_loss_delta=("loss_delta_vs_uniform_fill", "median"),
         mean_acc_delta=("acc_delta_vs_uniform_fill", "mean"),
         wins=("loss_delta_vs_uniform_fill", lambda x: int((x < 0).sum())),
-        n=("loss_delta_vs_uniform_fill", "size"),
+        n_pairs=("loss_delta_vs_uniform_fill", "size"),
     ).reset_index().sort_values(["mean_loss_delta", "label"])
     summary.to_csv(out_dir / "whitening_ablation_summary.csv", index=False)
 
+    curve = df.groupby(["label", "budget"], as_index=False).agg(final_val_loss=("final_val_loss", "mean"))
     plt.figure(figsize=(8, 5))
-    for label, sub in df.groupby("label"):
+    for label, sub in curve.groupby("label"):
         plt.plot(sub["budget"], sub["final_val_loss"], marker="o", label=label)
     plt.xlabel("parameter budget")
-    plt.ylabel("validation loss")
+    plt.ylabel("mean validation loss")
     plt.title("Whitening ablation: budget curve")
     plt.legend(fontsize=7)
     plt.tight_layout()
@@ -225,7 +301,7 @@ def _summarize_and_plot(df: pd.DataFrame, run_dir: Path) -> None:
     plot_df = summary.sort_values("mean_loss_delta")
     plt.barh(plot_df["label"], plot_df["mean_loss_delta"])
     plt.axvline(0.0, linestyle="--", linewidth=1)
-    plt.xlabel("mean loss delta vs uniform_fill")
+    plt.xlabel("mean paired loss delta vs uniform_fill")
     plt.title("Whitening ablation summary")
     plt.tight_layout()
     plt.savefig(fig_dir / "whitening_ablation_mean_delta.png", dpi=160)

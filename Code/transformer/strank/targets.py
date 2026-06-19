@@ -8,7 +8,14 @@ import pandas as pd
 
 def compute_targets(metrics: pd.DataFrame, near_gaps: List[float], recovery_fracs: List[float], lambdas: List[float]) -> pd.DataFrame:
     rows = []
-    for site, g in metrics.groupby("site_name"):
+    # Multiple adaptation replicates are nested within each site/rank.  Define
+    # the rank target from their mean loss rather than selecting an arbitrary
+    # replicate.
+    collapsed = (
+        metrics.groupby(["site_name", "rank"], as_index=False)
+        .agg(final_val_loss=("final_val_loss", "mean"))
+    )
+    for site, g in collapsed.groupby("site_name"):
         h = g.sort_values("rank")
         if 0 in set(h["rank"]):
             v0 = float(h.loc[h["rank"] == 0, "final_val_loss"].iloc[0])
