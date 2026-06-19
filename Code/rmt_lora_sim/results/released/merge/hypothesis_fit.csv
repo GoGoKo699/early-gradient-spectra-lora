@@ -1,0 +1,5 @@
+experiment,outcome,model,predictors,n,k,r2,adj_r2,rmse,aic
+merge,merge_degradation,H_spectral_interference,spectral_interference,64,2,0.0508463577701862,0.035537428056802156,0.02055608263269932,-493.22859376572274
+merge,merge_degradation,H_planted_overlap,overlap,64,2,0.04575072031656324,0.03035960290231432,0.020611187586421498,-492.88592162667084
+merge,merge_degradation,H_interference_plus_overlap,"spectral_interference,overlap",64,3,0.05142559664235691,0.02032479653227015,0.0205498093073151,-491.26766289258586
+merge,merge_degradation,H_nominal_rank_log2,log2(rank),64,2,3.5097480477475074e-11,-0.01612903222240103,0.02109949668030009,-489.88877973449246

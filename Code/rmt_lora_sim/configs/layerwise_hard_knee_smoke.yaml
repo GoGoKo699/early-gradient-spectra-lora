@@ -1,0 +1,43 @@
+seed: 82
+output:
+  base_dir: runs
+  name: layerwise_hard_knee_smoke
+layer_sweep:
+  n_layers: 3
+  max_task_rank: 6
+  ranks: [1, 2, 4, 8]
+  alpha_rule: proportional
+  alpha_multiplier: 1.0
+spikes:
+  k_strong_range: [1, 6]
+  spike_peak_range: [2.0, 3.0]
+  spike_decay_range: [0.02, 0.16]
+  weak_factor_range: [0.01, 0.08]
+summary:
+  recovery_targets: [0.50, 0.70, 0.80]
+  gap_tolerances: [0.05, 0.10, 0.20]
+  penalty_lambdas: [0.10, 0.20]
+task:
+  d_in: 64
+  d_out: 64
+  n_train: 256
+  n_val: 256
+  label_noise_std: 0.05
+  base_scale: 0.2
+  activation_spectrum: powerlaw
+  activation_decay: 0.7
+train:
+  lr: 0.2
+  steps: 100
+  init_scale: 0.05
+  eval_every: 50
+  batch_size: null
+  grad_clip: 5.0
+detect:
+  gradient_matrix_mode: activation_whitened
+  gradient_ridge_scale: 1.0e-06
+  include_raw_gradient: true
+  null_method: permute
+  n_boot: 5
+  quantile: 0.995
+  intruder_overlap_threshold: 0.1

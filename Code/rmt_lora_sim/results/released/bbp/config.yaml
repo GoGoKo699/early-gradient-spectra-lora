@@ -1,0 +1,25 @@
+seed: 7
+output:
+  base_dir: runs
+  name: bbp
+matrix:
+  m: 128
+  n: 128
+  rank: 1
+  noise_sigma: 1.0
+  heavy_tail_df: null
+sweep:
+  spikes:
+  - 0.1
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1.0
+  - 1.2
+  - 1.5
+  - 2.0
+  - 2.5
+  - 3.0
+  repetitions: 10
+detect:
+  margin: 1.0

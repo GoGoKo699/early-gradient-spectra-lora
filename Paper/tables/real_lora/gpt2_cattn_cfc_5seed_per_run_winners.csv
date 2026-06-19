@@ -1,0 +1,6 @@
+run_dir,seed,winner,winner_final_val_loss
+cattn_cfc/seed101,101,spectral_effective,3.453072004020214
+cattn_cfc/seed103,103,spectral_effective,3.4565080106258392
+cattn_cfc/seed107,107,spectral_effective,3.455415524542332
+cattn_cfc/seed109,109,uniform_r4,3.4596483185887337
+cattn_cfc/seed123,123,spectral_effective,3.4588971361517906

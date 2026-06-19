@@ -1,0 +1,4 @@
+run_dir,seed,winner,winner_final_val_loss
+attnproj/seed101,101,uniform_r4,3.4479165375232697
+attnproj/seed103,103,uniform_r4,3.446985229849816
+attnproj/seed107,107,uniform_r4,3.448923207819462

@@ -1,0 +1,34 @@
+seed: 123
+output:
+  base_dir: runs
+  name: smoke_lora_rank
+task:
+  d_in: 32
+  d_out: 32
+  n_train: 256
+  n_val: 128
+  task_rank: 4
+  task_spikes: [2.2, 1.6, 1.1, 0.7]
+  label_noise_std: 0.05
+  base_scale: 0.2
+  activation_spectrum: isotropic
+train:
+  lr: 0.8
+  steps: 50
+  weight_decay: 0.0
+  init_scale: 0.1
+  eval_every: 10
+  batch_size: null
+  grad_clip: 50.0
+sweep:
+  task_repetitions: 1
+  ranks: [1, 2, 4, 8]
+  alpha: 8
+detect:
+  gradient_matrix_mode: activation_whitened
+  gradient_ridge_scale: 1.0e-06
+  include_raw_gradient: true
+  null_method: permute
+  n_boot: 5
+  quantile: 0.95
+  intruder_overlap_threshold: 0.05

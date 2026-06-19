@@ -1,0 +1,42 @@
+seed: 31
+output:
+  base_dir: runs
+  name: alpha_noise_intruder
+
+task:
+  d_in: 128
+  d_out: 128
+  n_train: 384
+  n_val: 2048
+  task_rank: 4
+  task_spikes: [2.8, 2.1, 1.5, 1.05]
+  # More label noise and fewer samples make extra-rank directions capable of fitting noise.
+  label_noise_std: 0.20
+  base_scale: 0.2
+  activation_spectrum: powerlaw
+  activation_decay: 0.7
+
+train:
+  lr: 0.15
+  steps: 2500
+  weight_decay: 0.0
+  init_scale: 0.05
+  eval_every: 100
+  batch_size: null
+  grad_clip: 5.0
+
+sweep:
+  task_repetitions: 6
+  rank: 32
+  alphas: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+
+detect:
+  gradient_matrix_mode: activation_whitened
+  gradient_ridge_scale: 1.0e-06
+  include_raw_gradient: true
+  null_method: permute
+  n_boot: 20
+  quantile: 0.995
+  # Slightly stricter: a detectable direction whose left/right product overlap with
+  # the planted task subspace is below this is counted as an intruder.
+  intruder_overlap_threshold: 0.10

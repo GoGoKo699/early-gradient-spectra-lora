@@ -1,0 +1,21 @@
+# Tested core ROCm/PyTorch environment used for the GPT-2/Wikitext validation.
+# This records the core package versions observed in the working environment.
+# It is not a complete transitive lockfile; generate one locally with:
+#   python -m pip freeze > requirements-local-freeze.txt
+# before reproducing long runs.
+accelerate==1.14.0
+datasets==5.0.0
+numpy==1.26.4
+peft==0.19.1
+safetensors==0.8.0
+tokenizers==0.22.2
+torch==2.9.1+rocm7.2.1.lw.gitff65f5bc
+torchaudio==2.9.0+rocm7.2.1.gite3c6ee2b
+torchvision==0.24.0+rocm7.2.1.gitb919bd0c
+transformers==5.12.0
+triton==3.5.1+rocm7.2.1.gita272dfa8
+pandas>=2.1
+pyarrow>=15
+scikit-learn>=1.4
+evaluate>=0.4
+tqdm>=4.66

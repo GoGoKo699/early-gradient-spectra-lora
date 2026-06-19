@@ -1,0 +1,35 @@
+seed: 17
+output:
+  base_dir: runs
+  name: merge
+task:
+  d_in: 128
+  d_out: 128
+  n_val: 2048
+  task_rank: 8
+  task_spikes:
+  - 2.8
+  - 2.2
+  - 1.8
+  - 1.45
+  - 1.1
+  - 0.85
+  - 0.65
+  - 0.5
+  base_scale: 0.2
+  update_noise_sigma: 0.04
+sweep:
+  overlaps:
+  - 0.0
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 0.75
+  - 0.9
+  - 1.0
+  repetitions: 8
+detect:
+  null_method: permute
+  n_boot: 10
+  quantile: 0.995

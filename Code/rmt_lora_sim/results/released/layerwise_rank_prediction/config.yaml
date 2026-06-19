@@ -1,0 +1,40 @@
+seed: 71
+output:
+  base_dir: runs
+  name: layerwise_rank_prediction
+layer_sweep:
+  n_layers: 24
+  max_task_rank: 8
+  ranks:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  alpha_rule: proportional
+  alpha_fixed: 16.0
+  alpha_multiplier: 1.0
+  recovery_target: 0.95
+task:
+  d_in: 128
+  d_out: 128
+  n_train: 1024
+  n_val: 1024
+  label_noise_std: 0.05
+  base_scale: 0.2
+  activation_spectrum: powerlaw
+  activation_decay: 0.7
+train:
+  lr: 0.2
+  steps: 900
+  weight_decay: 0.0
+  init_scale: 0.05
+  eval_every: 100
+  batch_size: null
+  grad_clip: 5.0
+detect:
+  null_method: permute
+  n_boot: 16
+  quantile: 0.995
+  intruder_overlap_threshold: 0.1

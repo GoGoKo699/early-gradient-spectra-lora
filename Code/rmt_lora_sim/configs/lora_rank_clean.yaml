@@ -1,0 +1,40 @@
+seed: 21
+output:
+  base_dir: runs
+  name: lora_rank_clean
+
+task:
+  d_in: 128
+  d_out: 128
+  n_train: 2048
+  n_val: 1024
+  task_rank: 8
+  task_spikes: [2.8, 2.2, 1.8, 1.45, 1.1, 0.85, 0.65, 0.5]
+  label_noise_std: 0.05
+  base_scale: 0.2
+  activation_spectrum: powerlaw
+  activation_decay: 0.7
+
+train:
+  # Lower than the first run. The first rank=1 case exploded and dominated OLS.
+  lr: 0.2
+  steps: 1200
+  weight_decay: 0.0
+  init_scale: 0.05
+  eval_every: 100
+  batch_size: null
+  grad_clip: 5.0
+
+sweep:
+  task_repetitions: 8
+  ranks: [1, 2, 4, 8, 16, 32, 64]
+  alpha: 16
+
+detect:
+  gradient_matrix_mode: activation_whitened
+  gradient_ridge_scale: 1.0e-06
+  include_raw_gradient: true
+  null_method: permute
+  n_boot: 20
+  quantile: 0.995
+  intruder_overlap_threshold: 0.05

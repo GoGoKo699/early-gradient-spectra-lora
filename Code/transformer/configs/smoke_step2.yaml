@@ -1,0 +1,73 @@
+run:
+  name: smoke_step2
+  seed: 123
+  out_dir: runs
+  device: cpu
+  torch_threads: 2
+task:
+  name: modular
+  modulus: 17
+  base_offset: 0
+  adapt_offset: 3
+  seq_len: 4
+  train_batch_size: 64
+  eval_batches: 4
+model:
+  d_model: 32
+  n_layers: 1
+  n_heads: 2
+  d_mlp: 64
+  dropout: 0.0
+base_train:
+  steps: 80
+  lr: 0.003
+  weight_decay: 0.0
+  log_every: 40
+calibration:
+  batches: 4
+  batch_size: 64
+  whitening: diag
+  lambda_scale: 0.01
+  null_bootstrap: 4
+  null_quantile: 0.995
+  max_tokens_per_site: 4096
+sites:
+  include:
+  - blocks.0.attn.q_proj
+  - blocks.0.attn.v_proj
+  - blocks.0.attn.o_proj
+  - blocks.0.mlp.fc2
+lora:
+  ranks:
+  - 0
+  - 1
+  - 2
+  - 4
+  alpha: 8.0
+  lr: 0.02
+  steps: 80
+  weight_decay: 0.0
+  log_every: 40
+  grad_clip: 1.0
+budgets:
+  param_budgets:
+  - 256
+  - 512
+  rules:
+  - uniform
+  - uniform_fill
+  - effective_rank
+  - soft_dimension
+  - gradient_norm
+  - marginal_gain_edge
+  - marginal_gain_soft
+targets:
+  near_best_gaps:
+  - 0.1
+  - 0.2
+  recovery_fracs:
+  - 0.7
+  - 0.8
+  penalty_lambdas:
+  - 0.2
+  - 0.3

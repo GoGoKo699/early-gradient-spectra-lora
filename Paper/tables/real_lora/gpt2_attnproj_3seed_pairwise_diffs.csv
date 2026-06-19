@@ -1,0 +1,7 @@
+run_dir,seed,comparison,final_val_loss_diff,perplexity_diff,params_diff
+attnproj/seed101,101,spectral_minus_uniform_r4,0.0011118054389953,0.0349688514732768,-768
+attnproj/seed101,101,spectral_minus_gradient_norm,-0.0345964878797531,-1.107796989992206,0
+attnproj/seed103,103,spectral_minus_uniform_r4,0.0050887763500209,0.1602232405043153,0
+attnproj/seed103,103,spectral_minus_gradient_norm,-0.0309345573186874,-0.9917341487532808,0
+attnproj/seed107,107,spectral_minus_uniform_r4,0.0089796632528305,0.283830940543222,-768
+attnproj/seed107,107,spectral_minus_gradient_norm,-0.0295391976833343,-0.951868545575202,-768

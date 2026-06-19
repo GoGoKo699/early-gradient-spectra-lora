@@ -1,0 +1,49 @@
+seed: 31
+output:
+  base_dir: runs
+  name: alpha_noise_intruder
+task:
+  d_in: 128
+  d_out: 128
+  n_train: 384
+  n_val: 2048
+  task_rank: 4
+  task_spikes:
+  - 2.8
+  - 2.1
+  - 1.5
+  - 1.05
+  label_noise_std: 0.2
+  base_scale: 0.2
+  activation_spectrum: powerlaw
+  activation_decay: 0.7
+train:
+  lr: 0.15
+  steps: 2500
+  weight_decay: 0.0
+  init_scale: 0.05
+  eval_every: 100
+  batch_size: null
+  grad_clip: 5.0
+sweep:
+  task_repetitions: 6
+  rank: 32
+  alphas: &id001
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  ranks:
+  - 32
+  alpha: *id001
+detect:
+  null_method: permute
+  n_boot: 20
+  quantile: 0.995
+  intruder_overlap_threshold: 0.1

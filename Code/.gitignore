@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Logs / local attempts
+*.log
+*.bak
+*.bak_*
+*.backup
+*.save
+*~
+
+# LaTeX build files
+*.aux
+*.out
+*.synctex*
+*.fls
+*.fdb_latexmk
+*.blg
+*.bbl
+
+# Local runs and generated data
+runs/
+real_lora_runs/
+models/
+data/wikitext2_parquet/
+data/wikitext2_local/
+
+# Large archives
+*.zip
+*.tar.gz
+*.tgz
+
+# OS/editor
+.DS_Store
+.ipynb_checkpoints/

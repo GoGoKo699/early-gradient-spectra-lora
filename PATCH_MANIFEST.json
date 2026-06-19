@@ -1,0 +1,136 @@
+{
+  "corrected_results": {
+    "attnproj": {
+      "gradient_mean_final_val_loss": 3.484691821038723,
+      "spectral_mean_final_val_loss": 3.453001740078131,
+      "uniform_mean_final_val_loss": 3.447941658397516,
+      "uniform_wins": "3/3"
+    },
+    "cattn_cfc": {
+      "gradient_mean_final_val_loss": 3.504724198579788,
+      "spectral_mean_final_val_loss": 3.457263457775116,
+      "spectral_wins": "4/5",
+      "uniform_mean_final_val_loss": 3.4587480053305626
+    }
+  },
+  "created_date": "2026-06-19",
+  "effective_rank_definition": "p_i = sigma_i^2 / sum_j sigma_j^2",
+  "key_files": [
+    {
+      "bytes": 44120,
+      "path": "Paper/paper.tex",
+      "sha256": "249460210fc3fe713ab1fafdcb3ea80370f5cf7ec0541d21c69621b1f26ade1b"
+    },
+    {
+      "bytes": 706115,
+      "path": "paper.pdf",
+      "sha256": "1a1dfa565377d147089606d1bec690e0b90de2ad05b6172b0027597e9a6693c4"
+    },
+    {
+      "bytes": 462,
+      "path": "Paper/tables/generated/real_lora_rows.tex",
+      "sha256": "44252670978db540a9251b75f729b698046f39f3d9cbfb1e2b1762ec3fed1ac1"
+    },
+    {
+      "bytes": 312,
+      "path": "Paper/tables/generated/real_lora_pairwise_rows.tex",
+      "sha256": "4d6a969667bf4f1dda285cf057e2f832eeb1a9cfb9691ebdabe5ebfadc6af0e9"
+    },
+    {
+      "bytes": 31131,
+      "path": "Code/real_lora_validation/run_real_lora_validation.py",
+      "sha256": "3ec5dc45650b53b8fdb4c44d06ffb3b84ad9889debfeebafbdbdd081d17c6ddd"
+    },
+    {
+      "bytes": 1135,
+      "path": "Code/real_lora_validation/spectral_metrics.py",
+      "sha256": "a7f7f83d55aff98b222be0c7a6379e56baee09c4d0b5cdbb4416b940ec12bb4c"
+    },
+    {
+      "bytes": 2648,
+      "path": "Code/real_lora_validation/INPUT_MANIFEST.json",
+      "sha256": "3479dc2f31c11e0c0bac46e200ac459926ac07deaaa201ac03b342234948a29a"
+    },
+    {
+      "bytes": 767,
+      "path": "Code/real_lora_validation/results/released/gpt2_cattn_cfc_5seed/summary_by_strategy.csv",
+      "sha256": "416a6ba92b480ce7f5ba0b6e9e863114774cc4e072896f38bfcbd43bc4c5201d"
+    },
+    {
+      "bytes": 758,
+      "path": "Code/real_lora_validation/results/released/gpt2_attnproj_3seed/summary_by_strategy.csv",
+      "sha256": "8c74aeb1713e79c528b5847690c7a48fcd304fc0d9f1ec476c31077a40d7ef5f"
+    },
+    {
+      "bytes": 3390,
+      "path": "Code/real_lora_validation/results/corrected_full_runs/corrected_full_20260619_165707/RERUN_CONTEXT.json",
+      "sha256": "aedf862344480d89e0241755e9b34ad80ea38c7c1e02af3db46baed77099dcad"
+    },
+    {
+      "bytes": 3940,
+      "path": "EFFECTIVE_RANK_CORRECTION_RESULTS.md",
+      "sha256": "e1b669861281f580e5aa7fad01e67c2cad45cb0ac0fecf252a7f9a26342ed9d2"
+    },
+    {
+      "bytes": 3980,
+      "path": "CORRECTION_VALIDATION_REPORT.md",
+      "sha256": "d19585d7477627db044433599f02d13a201ff3e3891fcc0a197643aeb1126316"
+    },
+    {
+      "bytes": 6208,
+      "path": "RUN_ME_FIRST.md",
+      "sha256": "6c8a3eedbeb1580f3f4b5160cdba8d261213537bca69a59a141332954b35d0df"
+    },
+    {
+      "bytes": 1891,
+      "path": "EFFECTIVE_RANK_PATCH_NOTES.md",
+      "sha256": "93bbc0f55963afebc0c9ed85fa4aa1fe5abf6e681358a0ca677185ab6a51692e"
+    }
+  ],
+  "patch_name": "real_gpt2_squared_singular_value_effective_rank",
+  "remaining_separate_issues": [
+    "first-page continuation-line layout",
+    "page-5 float/blank-space layout"
+  ],
+  "rerun_scope": {
+    "ablation_seeds": [
+      101,
+      103,
+      107
+    ],
+    "all_strategies_rerun_together": true,
+    "main_seeds": [
+      101,
+      103,
+      107,
+      109,
+      123
+    ],
+    "matched_strategy_batch_order": true,
+    "seed_count": 8,
+    "strategy_runs": 24
+  },
+  "run_identifier": "corrected_full_20260619_165707",
+  "source_rerun_bundle": {
+    "bytes": 112522,
+    "filename": "CORRECTED_REAL_GPT2_RESULTS_corrected_full_20260619_165707.zip",
+    "sha256": "403e56c60e1d9b7d146e7d2f5be4ecb32732ae406b0a34dae7850419bcc3fc39"
+  },
+  "status": "corrected full GPU rerun integrated; manuscript and PDF rebuilt",
+  "validation": {
+    "checksum_entries_verified": 157,
+    "checksum_failures": 0,
+    "code_hash_verification": "5/5 passed",
+    "embedded_fonts": "passed; no Type 3 fonts",
+    "independent_aggregate_recomputation": "passed",
+    "latex_build": "passed twice; 12 pages",
+    "nested_checksum_manifests": 13,
+    "overfull_boxes": 0,
+    "python_compile_checks": "passed",
+    "real_validation_tests": "7 passed",
+    "render_inspection": "corrected GPT-2 prose and table pages passed",
+    "rmt_tests": "9 passed",
+    "transformer_tests": "5 passed",
+    "undefined_references_or_citations": 0
+  }
+}

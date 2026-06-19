@@ -1,0 +1,9 @@
+run_dir: /home/ubuntu/下载/Lora_Project/Code/real_lora_validation/real_lora_runs/corrected_full_20260619_165707/cattn_cfc/seed101/20260619_165709_models_gpt2_local
+model: models/gpt2_local
+dataset_mode: local
+best_strategy: spectral_effective
+
+results:
+  uniform_r4: initial=3.9486 final=3.4546 delta=-0.4940 ppl=31.65 params=331776
+  gradient_norm: initial=3.9486 final=3.5015 delta=-0.4471 ppl=33.16 params=329472
+  spectral_effective: initial=3.9486 final=3.4531 delta=-0.4956 ppl=31.60 params=331776

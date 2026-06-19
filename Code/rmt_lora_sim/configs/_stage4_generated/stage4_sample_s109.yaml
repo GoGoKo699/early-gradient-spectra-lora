@@ -1,0 +1,75 @@
+seed: 109
+output:
+  base_dir: runs
+  name: stage4_sample_s109
+layer_sweep:
+  n_layers: 48
+  max_task_rank: 8
+  ranks:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  alpha_rule: proportional
+  alpha_fixed: 16.0
+  alpha_multiplier: 1.0
+spikes:
+  k_strong_range:
+  - 1
+  - 8
+  spike_peak_range:
+  - 1.7
+  - 3.4
+  spike_decay_range:
+  - 0.05
+  - 0.3
+  weak_factor_range:
+  - 0.05
+  - 0.25
+  spike_jitter: 0.06
+  spike_floor: 0.01
+summary:
+  recovery_targets:
+  - 0.5
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  gap_tolerances:
+  - 0.02
+  - 0.05
+  - 0.1
+  - 0.2
+  penalty_lambdas:
+  - 0.05
+  - 0.1
+  - 0.15
+  - 0.2
+  - 0.3
+task:
+  d_in: 128
+  d_out: 128
+  n_train: 384
+  n_val: 2048
+  label_noise_std: 0.12
+  base_scale: 0.2
+  activation_spectrum: powerlaw
+  activation_decay: 0.7
+train:
+  lr: 0.18
+  steps: 1000
+  weight_decay: 0.0
+  init_scale: 0.05
+  eval_every: 100
+  batch_size: null
+  grad_clip: 5.0
+detect:
+  gradient_matrix_mode: activation_whitened
+  gradient_ridge_scale: 1.0e-06
+  include_raw_gradient: true
+  null_method: permute
+  n_boot: 16
+  quantile: 0.995
+  intruder_overlap_threshold: 0.1

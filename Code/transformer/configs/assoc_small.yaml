@@ -1,0 +1,73 @@
+run:
+  name: assoc_small
+  seed: 202
+  out_dir: runs
+  device: cpu
+  torch_threads: 1
+
+task:
+  name: associative_recall
+  num_keys: 16
+  num_pairs: 4
+  base_shift: 0
+  adapt_shift: 3
+  train_batch_size: 128
+  eval_batches: 8
+
+model:
+  d_model: 64
+  n_layers: 2
+  n_heads: 4
+  d_mlp: 128
+  dropout: 0.0
+
+base_train:
+  steps: 800
+  lr: 0.002
+  weight_decay: 0.0
+  log_every: 100
+
+calibration:
+  batches: 8
+  batch_size: 128
+  whitening: diag
+  lambda_scale: 0.01
+  null_bootstrap: 8
+  null_quantile: 0.995
+  max_tokens_per_site: 8192
+
+sites:
+  include:
+    - blocks.0.attn.q_proj
+    - blocks.0.attn.k_proj
+    - blocks.0.attn.v_proj
+    - blocks.0.attn.o_proj
+    - blocks.0.mlp.fc2
+    - blocks.1.attn.q_proj
+    - blocks.1.attn.k_proj
+    - blocks.1.attn.v_proj
+    - blocks.1.attn.o_proj
+    - blocks.1.mlp.fc2
+
+lora:
+  ranks: [0, 1, 2, 4, 8, 16]
+  alpha: 16.0
+  lr: 0.01
+  steps: 400
+  weight_decay: 0.0
+  log_every: 100
+  grad_clip: 1.0
+
+budgets:
+  param_budgets: [512, 1024, 2048, 4096]
+  rules:
+    - uniform
+    - uniform_fill
+    - effective_rank
+    - soft_dimension
+    - gradient_norm
+
+targets:
+  near_best_gaps: [0.1, 0.2]
+  recovery_fracs: [0.7, 0.8]
+  penalty_lambdas: [0.2, 0.3]

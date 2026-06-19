@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rmt-lora-sim"
+version = "0.1.0"
+description = "Pure numerical simulations for spiked-RMT hypotheses about low-rank transformer adaptation."
+authors = [{name = "Research prototype"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+    "pyyaml>=6.0",
+    "threadpoolctl>=3.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rmt_lora*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[project.scripts]
+rmt-bbp = "rmt_lora.cli:run_bbp_cli"
+rmt-lora-rank = "rmt_lora.cli:run_lora_rank_cli"
+rmt-alpha = "rmt_lora.cli:run_alpha_cli"
+rmt-merge = "rmt_lora.cli:run_merge_cli"
+rmt-plot = "rmt_lora.cli:plot_cli"
+rmt-fit = "rmt_lora.cli:fit_cli"

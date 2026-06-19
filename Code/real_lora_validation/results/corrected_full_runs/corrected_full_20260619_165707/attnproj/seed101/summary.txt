@@ -1,0 +1,9 @@
+run_dir: /home/ubuntu/下载/Lora_Project/Code/real_lora_validation/real_lora_runs/corrected_full_20260619_165707/attnproj/seed101/20260619_171150_models_gpt2_local
+model: models/gpt2_local
+dataset_mode: local
+best_strategy: uniform_r4
+
+results:
+  uniform_r4: initial=3.9486 final=3.4479 delta=-0.5007 ppl=31.43 params=405504
+  gradient_norm: initial=3.9486 final=3.4836 delta=-0.4650 ppl=32.58 params=404736
+  spectral_effective: initial=3.9486 final=3.4490 delta=-0.4996 ppl=31.47 params=404736

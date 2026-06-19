@@ -1,0 +1,79 @@
+{
+  "created_utc": "2026-06-19T08:52:27.225885+00:00",
+  "dataset": {
+    "config": "wikitext-2-raw-v1",
+    "parquet_files": {
+      "train": {
+        "bytes": 6357543,
+        "path": "data/wikitext2_source/wikitext-2-raw-v1/train-00000-of-00001.parquet",
+        "sha256": "e83889baabc497075506f91975be5fac0d45c5290b6b20582c8cd1e853d0c9f7"
+      },
+      "validation": {
+        "bytes": 657209,
+        "path": "data/wikitext2_source/wikitext-2-raw-v1/validation-00000-of-00001.parquet",
+        "sha256": "204929b7ff9d6184953f867dedb860e40aa69c078fc1e54b3baaa8fb28511c4c"
+      }
+    },
+    "repo_id": "Salesforce/wikitext",
+    "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+    "text_files": {
+      "train": {
+        "bytes": 10927796,
+        "path": "data/wikitext2_local/train.txt",
+        "sha256": "57f3eb280cfe78d8cebe3aa76d7416607845416e22464dd9709ccb487f8d7b92",
+        "source_rows": 36718
+      },
+      "validation": {
+        "bytes": 1145547,
+        "path": "data/wikitext2_local/validation.txt",
+        "sha256": "fbf387067edf87fc0f11e8cc1708be8ff6c944f6eeb98c1e34140c8a95629a00",
+        "source_rows": 3760
+      }
+    }
+  },
+  "model": {
+    "files": [
+      {
+        "bytes": 665,
+        "path": "models/gpt2_local/config.json",
+        "sha256": "0daed7749b4f02b8f76240d5444551d7b08712dab4d0adb8239c56ba823bb7b4"
+      },
+      {
+        "bytes": 124,
+        "path": "models/gpt2_local/generation_config.json",
+        "sha256": "ed0b32ac72c0f5f44a719abb2d7786ea5146c871f83717b7f2018065954de02b"
+      },
+      {
+        "bytes": 456318,
+        "path": "models/gpt2_local/merges.txt",
+        "sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5"
+      },
+      {
+        "bytes": 548105171,
+        "path": "models/gpt2_local/model.safetensors",
+        "sha256": "248dfc3911869ec493c76e65bf2fcf7f615828b0254c12b473182f0f81d3a707"
+      },
+      {
+        "bytes": 1355256,
+        "path": "models/gpt2_local/tokenizer.json",
+        "sha256": "8414cab924d8b9b33013f0d221c5862f365ee9be39c5c2bfae8a5a9e970478a6"
+      },
+      {
+        "bytes": 26,
+        "path": "models/gpt2_local/tokenizer_config.json",
+        "sha256": "5e04eb606e3a1583530a42e36c2a6b6615c86f34fe77e44d9ddeb43ff940931f"
+      },
+      {
+        "bytes": 1042301,
+        "path": "models/gpt2_local/vocab.json",
+        "sha256": "196139668be63f3b5d6574427317ae82f612a97c5d1cdaf36ed2256dbf636783"
+      }
+    ],
+    "model_type": "gpt2",
+    "n_embd": 768,
+    "n_layer": 12,
+    "repo_id": "openai-community/gpt2",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "vocab_size": 50257
+  }
+}

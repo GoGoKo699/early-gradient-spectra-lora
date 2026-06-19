@@ -1,0 +1,7 @@
+model,predictors,n,ols_r2,spearman_first_predictor,aic
+adapter_stable_rank,adapter_stable_rank,56,0.8459706466049263,-0.906269758672284,-452.18786811347326
+adapter_effective_rank,adapter_effective_rank,56,0.8400203892850895,-0.9198038245332116,-450.0652898519567
+adapter_detectable,adapter_detectable_rank,56,0.8386808686662691,-0.9410237082640424,-449.5983500280456
+adapter_detectable_plus_alpha,"adapter_detectable_rank,log2_alpha",56,0.8386808686662691,,-447.5983500280456
+adapter_frobenius,adapter_frobenius,56,0.8323409916676073,-0.9049213943950788,-447.4396833604985
+log_adapter_frobenius,log10_adapter_frobenius,56,0.6663402093577495,-0.9049213943950788,-408.9010614511046

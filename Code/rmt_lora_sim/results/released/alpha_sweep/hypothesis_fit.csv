@@ -1,0 +1,13 @@
+experiment,outcome,model,predictors,n,k,r2,adj_r2,rmse,aic
+lora_rank,final_val_loss,H_adapter_frobenius,adapter_frobenius,16,2,0.9915711870903994,0.9909691290254279,0.006312672982254701,-158.08627421054587
+lora_rank,final_val_loss,H_adapter_detectable_plus_alpha,"adapter_detectable_rank,log2(alpha)",16,3,0.9024849574930779,0.8874826432612437,0.021471673377147827,-116.91266332144082
+lora_rank,final_val_loss,H_alpha_log2,log2(alpha),16,2,0.8873394572290112,0.879292275602512,0.0230789477829396,-116.60270167797506
+lora_rank,final_val_loss,H_nominal_rank_plus_alpha,"log2(rank),log2(alpha)",16,3,0.8873394572290112,0.8700070660334744,0.0230789477829396,-114.60270167797506
+lora_rank,final_val_loss,H_adapter_stable_rank,adapter_stable_rank,16,2,0.6954312769043169,0.6736763681117681,0.03794658836473538,-100.69042166389711
+lora_rank,final_val_loss,H_adapter_effective_rank,adapter_effective_rank,16,2,0.6554017586453247,0.6307875985485621,0.040363295117834354,-98.71470218768026
+lora_rank,final_val_loss,H_final_adapter_detectable_rank,adapter_detectable_rank,16,2,0.5956422809165997,0.5667595866963567,0.0437233021394726,-96.15597084797733
+lora_rank,final_val_loss,H_detectable_rank_plus_intruders,"adapter_detectable_rank,intruder_count",16,3,0.5956422809165997,0.5334334010576149,0.0437233021394726,-94.15597084797733
+lora_rank,final_val_loss,H_nominal_rank_log2,log2(rank),16,2,1.3219869643421589e-11,-0.07142857141440717,0.06875908439515076,-81.66868526087167
+lora_rank,final_val_loss,H_early_gradient_detectable_rank,gradient_detectable_rank,16,2,1.3219758621119126e-11,-0.0714285714144074,0.06875908439515076,-81.66868526087167
+lora_rank,final_val_loss,H_intruder_count,intruder_count,16,2,1.3219758621119126e-11,-0.0714285714144074,0.06875908439515076,-81.66868526087167
+lora_rank,final_val_loss,H_gradient_detectable_plus_nominal_rank,"gradient_detectable_rank,log2(rank)",16,3,1.3219758621119126e-11,-0.15384615383090017,0.06875908439515076,-79.66868526087167

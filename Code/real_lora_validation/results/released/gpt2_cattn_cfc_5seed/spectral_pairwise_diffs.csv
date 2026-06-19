@@ -1,0 +1,11 @@
+run_dir,seed,comparison,final_val_loss_diff,perplexity_diff,params_diff
+cattn_cfc/seed101,101,spectral_minus_uniform_r4,-0.0015163198113441467,-0.047947970833480014,0
+cattn_cfc/seed101,101,spectral_minus_gradient_norm,-0.04841896891593933,-1.5675525966916908,2304
+cattn_cfc/seed103,103,spectral_minus_uniform_r4,-0.0022685304284095764,-0.0720078199652967,0
+cattn_cfc/seed103,103,spectral_minus_gradient_norm,-0.04481939226388931,-1.4533729598176706,0
+cattn_cfc/seed107,107,spectral_minus_uniform_r4,-0.0008379593491549819,-0.026550507023515024,0
+cattn_cfc/seed107,107,spectral_minus_gradient_norm,-0.0505193248391147,-1.6411253255448592,1536
+cattn_cfc/seed109,109,spectral_minus_uniform_r4,0.0027762949466705322,0.08842494145653035,0
+cattn_cfc/seed109,109,spectral_minus_gradient_norm,-0.045517779886722565,-1.4853011810615548,2304
+cattn_cfc/seed123,123,spectral_minus_uniform_r4,-0.005576223134994507,-0.17771803708268408,0
+cattn_cfc/seed123,123,spectral_minus_gradient_norm,-0.04802823811769441,-1.5636787518831952,2304
