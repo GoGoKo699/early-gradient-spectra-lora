@@ -1,75 +1,90 @@
-# Stage4 replication
+# Stage4 useful-rank replication
 
-This repeats the layerwise useful-rank experiments across multiple random seeds and aggregates the results used in the paper.
+Stage4 predicts practical adapter-rank targets from early-gradient spectral
+statistics. The publication estimand is fixed in `rmt_lora/targets.py`:
 
-Run from the `rmt_lora_sim` project directory:
+```text
+Vmin = minimum validation loss over the tested rank grid
+DeltaV = V0 - Vmin
+near-best(gamma) = smallest r with V(r) <= Vmin + gamma DeltaV
+recovery(rho) = smallest r with (V0 - V(r)) / DeltaV >= rho
+penalized(lambda) = argmin_r V(r) + lambda DeltaV r / rmax
+```
+
+The simulation oracle loss is diagnostic only. It cannot affect a target
+threshold or penalty. Curves with nonpositive observed improvement have
+undefined useful-rank targets and are excluded from target fits. Fits use
+`log2(rank)` against `log2(1 + spectral_score)`, exactly as stated in the
+manuscript.
+
+The pre-rerun analysis plan is machine-readable in
+`rmt_lora/stage4_analysis.py`. The hard-knee `near_best_rank_gap_0.1` versus
+`gradient_effective_rank` pair is primary; the sample-limited counterpart is a
+prespecified robustness check. Other combinations are secondary or exploratory.
+
+## End-to-end smoke check
+
+Run from `Code/rmt_lora_sim`:
+
+```bash
+bash scripts/run_stage4_smoke.sh
+```
+
+This executes one seed in each condition with reduced dimensions, independently
+recomputes the targets, aggregates the exact source runs, validates every nested
+checksum, and creates a portable archive under:
+
+```text
+runs/stage4_releases/
+```
+
+A smoke or fast release is a pipeline check only. The paper importer rejects it.
+
+## Publication run
 
 ```bash
 bash scripts/run_stage4.sh
 ```
 
-The default `run_stage4.sh` is the paper-grade run:
+The paper profile runs:
 
 ```text
 5 seeds x 48 synthetic layers x 2 conditions
 ```
 
-For a shorter check, use:
+It refuses a dirty Git worktree and writes a self-contained release containing:
+
+```text
+configs/                         exact generated configs
+source_runs/                     raw per-rank metrics for every seed
+aggregate/stage4_key_table.csv   publication aggregate
+aggregate/stage4_source_runs.csv source paths and hashes
+aggregate/aggregate_manifest.json
+release_manifest.json
+SHA256SUMS.txt                   recursive release manifest
+```
+
+Validate a release independently with:
 
 ```bash
-bash scripts/run_stage4_fast.sh
+PYTHONPATH=. python3 scripts/validate_stage4_release.py \
+  runs/stage4_releases/<release-id> \
+  --expected-seeds 101,103,107,109,113 \
+  --expected-conditions hard_knee,sample_limited
 ```
 
-The fast script runs:
+## Importing a corrected release into the manuscript
 
-```text
-3 seeds x 32 synthetic layers x 2 conditions
-```
-
-Outputs:
-
-```text
-runs/stage4_aggregate/stage4_all_fits.csv
-runs/stage4_aggregate/stage4_key_table.csv
-runs/stage4_aggregate/stage4_best_predictor_counts.csv
-runs/stage4_aggregate/stage4_spearman_hard_knee.png
-runs/stage4_aggregate/stage4_spearman_sample_limited.png
-rmt_lora_stage4_runs.tar.gz
-```
-
-The key success criterion is whether `gradient_effective_rank` or `gradient_detectable_rank` predicts useful-rank targets such as:
-
-```text
-near_best_rank_gap_0.1
-near_best_rank_gap_0.2
-recovery_rank_0.7
-recovery_rank_0.8
-penalized_rank_lambda_0.2
-penalized_rank_lambda_0.3
-```
-
-In the publication configs, `gradient_*` means the activation-whitened early-gradient matrix. Raw unwhitened ablations are kept as `raw_gradient_*` and included in aggregate predictor tables when present.
-
-## Importing Stage4 into the paper
-
-To use a fresh Stage4 aggregate in the manuscript tables, run from `Code/`:
+After the five-seed release validates:
 
 ```bash
+cd ..
 make stage4-to-paper
 make paper
 ```
 
-`make stage4-to-paper` reads a locally rerun `Code/rmt_lora_sim/runs/stage4_aggregate/stage4_key_table.csv` and rewrites `Paper/tables/stage4_gradient_effective_summary.csv`.
-
-To import the bundled released aggregate instead, run from `Code/`:
-
-```bash
-make stage4-release-to-paper
-make paper
-```
-
-## Clean release provenance
-
-The clean release intentionally exposes `results/released/stage4_aggregate/` as the authoritative compact Stage4 artifact. Historical per-seed Stage4 release folders are excluded because stale raw-gradient runs can contradict the activation-whitened aggregate used by the paper.
-
-Use `make stage4-release-to-paper` from the top-level `Code/` directory to import the bundled released aggregate into the paper table. Use `make stage4-to-paper` only after rerunning Stage4 locally.
+`make stage4-to-paper` follows `runs/stage4_releases/LATEST`, verifies the
+aggregate checksums and observed-best metadata, and requires exactly five seed
+runs in each condition. The old compact aggregate under
+`results/released/stage4_aggregate/` used oracle-gap targets and is superseded;
+the importer intentionally rejects it.

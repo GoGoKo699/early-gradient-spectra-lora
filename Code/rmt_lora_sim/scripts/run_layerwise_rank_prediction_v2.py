@@ -20,7 +20,35 @@ from rmt_lora.lora_sim import (
     mse_loss,
 )
 from rmt_lora.nulls import bootstrap_edge
+from rmt_lora.provenance import (
+    git_state,
+    runtime_versions,
+    utc_now_iso,
+    write_json,
+    write_sha256s,
+)
 from rmt_lora.spectra import summarize_spectrum
+from rmt_lora.stage4_analysis import (
+    ANALYSIS_PLAN_VERSION,
+    PREDICTOR_TRANSFORM,
+    PRIMARY_PREDICTOR,
+    PRIMARY_TARGET,
+    TARGET_TRANSFORM,
+    analysis_plan_document,
+    spearman_or_nan,
+    transform_spectral_predictor,
+)
+from rmt_lora.targets import (
+    TARGET_DENOMINATOR,
+    TARGET_ESTIMAND,
+    TARGET_ESTIMAND_VERSION,
+    TARGET_REFERENCE,
+    annotate_observed_best_curves,
+    summarize_observed_best_curve,
+    target_definition_document,
+    useful_rank_target_columns,
+    validate_target_estimand_frame,
+)
 
 
 def _as_pair(x: Any, default: tuple[float, float]) -> tuple[float, float]:
@@ -94,20 +122,18 @@ def _summarize_layers(df: pd.DataFrame, ranks: list[int], cfg: dict[str, Any]) -
     recovery_targets = [float(v) for v in cfg.get("recovery_targets", [0.50, 0.70, 0.80, 0.90, 0.95])]
     gap_tolerances = [float(v) for v in cfg.get("gap_tolerances", [0.02, 0.05, 0.10, 0.20])]
     penalty_lambdas = [float(v) for v in cfg.get("penalty_lambdas", [0.05, 0.10, 0.15, 0.20, 0.30])]
+    gap_epsilon = float(cfg.get("gap_epsilon", 1e-12))
     rows: list[dict[str, Any]] = []
-    max_rank = max(ranks)
 
     for layer, g0 in df.groupby("layer"):
         g = g0.sort_values("rank").copy()
-        base = float(g["base_val_loss"].iloc[0])
-        oracle = float(g["oracle_val_loss"].iloc[0])
-        gap = max(base - oracle, 1e-12)
-        g["normalized_residual"] = (g["final_val_loss"] - oracle) / gap
-        g["recovery_frac"] = (base - g["final_val_loss"]) / gap
-
-        min_idx = g["final_val_loss"].idxmin()
-        best = g.loc[min_idx]
-        min_loss = float(best["final_val_loss"])
+        target_row = summarize_observed_best_curve(
+            g,
+            recovery_targets=recovery_targets,
+            gap_tolerances=gap_tolerances,
+            penalty_lambdas=penalty_lambdas,
+            gap_epsilon=gap_epsilon,
+        )
 
         det = int(g["gradient_detectable_rank"].iloc[0])
         geff = float(g["gradient_effective_rank"].iloc[0])
@@ -115,9 +141,7 @@ def _summarize_layers(df: pd.DataFrame, ranks: list[int], cfg: dict[str, Any]) -
 
         row: dict[str, Any] = {
             "layer": int(layer),
-            "base_val_loss": base,
-            "oracle_val_loss": oracle,
-            "improvement_gap": gap,
+            **target_row,
             "gradient_matrix_mode": str(g["gradient_matrix_mode"].iloc[0]) if "gradient_matrix_mode" in g.columns else "legacy_raw",
             "gradient_detectable_rank": det,
             "gradient_stable_rank": gstb,
@@ -125,8 +149,6 @@ def _summarize_layers(df: pd.DataFrame, ranks: list[int], cfg: dict[str, Any]) -
             "predicted_rank_detectable": _power2_ceiling(det, ranks),
             "predicted_rank_effective": _power2_ceiling(geff, ranks),
             "predicted_rank_stable": _power2_ceiling(gstb, ranks),
-            "best_rank": int(best["rank"]),
-            "best_val_loss": min_loss,
             "true_k_strong": int(g["true_k_strong"].iloc[0]),
             "spike_peak": float(g["spike_peak"].iloc[0]),
             "spike_decay": float(g["spike_decay"].iloc[0]),
@@ -159,22 +181,6 @@ def _summarize_layers(df: pd.DataFrame, ranks: list[int], cfg: dict[str, Any]) -
                 "predicted_rank_whitened_stable": _power2_ceiling(wh_stb, ranks),
             })
 
-        for tol in gap_tolerances:
-            near_threshold = min_loss + tol * gap
-            near = g[g["final_val_loss"] <= near_threshold].sort_values("rank")
-            row[f"near_best_rank_gap_{tol:g}"] = int(near["rank"].iloc[0]) if len(near) else int(best["rank"])
-
-        for target in recovery_targets:
-            recovered = g[g["recovery_frac"] >= target].sort_values("rank")
-            row[f"recovery_rank_{target:g}"] = float(recovered["rank"].iloc[0]) if len(recovered) else np.nan
-
-        for lam in penalty_lambdas:
-            # Cost is normalized nominal LoRA rank.  This is the PEFT setting:
-            # do not ask for the absolute best loss; ask for the best loss/rank tradeoff.
-            score = g["normalized_residual"] + lam * (g["rank"] / max_rank)
-            idx = score.idxmin()
-            row[f"penalized_rank_lambda_{lam:g}"] = int(g.loc[idx, "rank"])
-
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -201,8 +207,8 @@ def _ols_table(summary: pd.DataFrame) -> pd.DataFrame:
         ("predicted_rank_whitened_stable", "predicted_rank_whitened_stable", "log"),
         ("true_k_strong", "true_k_strong", "log"),
     ]
-    target_cols = [c for c in summary.columns if c.startswith("near_best_rank_gap_") or c.startswith("recovery_rank_") or c.startswith("penalized_rank_lambda_")]
-    target_cols = ["best_rank"] + target_cols
+    validate_target_estimand_frame(summary, context="layer summary")
+    target_cols = ["best_rank"] + useful_rank_target_columns(summary.columns)
     rows: list[dict[str, Any]] = []
     for target in target_cols:
         for name, pred_col, transform in predictors:
@@ -214,7 +220,7 @@ def _ols_table(summary: pd.DataFrame) -> pd.DataFrame:
             y = np.log2(np.asarray(sub[target], dtype=float))
             x = np.asarray(sub[pred_col], dtype=float)
             if transform == "log":
-                x = np.log2(np.maximum(x, 1.0))
+                x = transform_spectral_predictor(x)
             sst = float(np.sum((y - y.mean()) ** 2))
             if sst <= 1e-12:
                 r2 = np.nan
@@ -226,16 +232,48 @@ def _ols_table(summary: pd.DataFrame) -> pd.DataFrame:
                 sse = float(np.sum(resid ** 2))
                 r2 = 1.0 - sse / sst
                 rmse = float(np.sqrt(sse / len(sub)))
-            spearman = float(pd.Series(sub[pred_col]).corr(pd.Series(sub[target]), method="spearman"))
+            spearman = spearman_or_nan(sub[pred_col], sub[target])
             rows.append({
+                "target_estimand": TARGET_ESTIMAND,
+                "target_estimand_version": TARGET_ESTIMAND_VERSION,
+                "target_reference": TARGET_REFERENCE,
+                "target_denominator": TARGET_DENOMINATOR,
+                "analysis_plan_version": ANALYSIS_PLAN_VERSION,
+                "analysis_pair_role": (
+                    "primary_pair"
+                    if target == PRIMARY_TARGET and name == PRIMARY_PREDICTOR
+                    else "secondary_or_exploratory"
+                ),
+                "target_transform": TARGET_TRANSFORM,
+                "predictor_transform": PREDICTOR_TRANSFORM,
                 "target": target,
+                "target_role": "diagnostic" if target == "best_rank" else "useful_rank",
                 "predictor": name,
                 "n": int(len(sub)),
                 "r2_log2_target": r2,
                 "spearman": spearman,
                 "rmse_log2": rmse,
             })
-    out = pd.DataFrame(rows, columns=["target", "predictor", "n", "r2_log2_target", "spearman", "rmse_log2"])
+    out = pd.DataFrame(
+        rows,
+        columns=[
+            "target_estimand",
+            "target_estimand_version",
+            "target_reference",
+            "target_denominator",
+            "analysis_plan_version",
+            "analysis_pair_role",
+            "target_transform",
+            "predictor_transform",
+            "target",
+            "target_role",
+            "predictor",
+            "n",
+            "r2_log2_target",
+            "spearman",
+            "rmse_log2",
+        ],
+    )
     if len(out):
         out = out.sort_values(["target", "r2_log2_target"], ascending=[True, False], na_position="last")
     return out
@@ -412,19 +450,48 @@ def run(config: dict[str, Any], do_plot: bool = False) -> Path:
 
     metrics = pd.DataFrame(rows)
     metrics.to_csv(run_dir / "metrics.csv", index=False)
+    annotated_metrics = annotate_observed_best_curves(
+        metrics, gap_epsilon=float(summary_cfg.get("gap_epsilon", 1e-12))
+    )
+    annotated_metrics.to_csv(run_dir / "target_curve_metrics.csv", index=False)
     summary = _summarize_layers(metrics, ranks, summary_cfg)
     summary.to_csv(run_dir / "layer_summary.csv", index=False)
     fits = _ols_table(summary)
     fits.to_csv(run_dir / "layer_rank_fit.csv", index=False)
 
+    paths: list[Path] = []
     if do_plot:
         paths = _plot(metrics, summary, run_dir / "figures")
-        print(f"wrote {run_dir}")
+
+    write_json(run_dir / "target_definition.json", target_definition_document())
+    write_json(run_dir / "analysis_plan.json", analysis_plan_document())
+    write_json(
+        run_dir / "run_metadata.json",
+        {
+            "schema_version": 1,
+            "created_utc": utc_now_iso(),
+            "experiment": deep_get(config, "output.name", "layerwise_rank_prediction_v2"),
+            "seed": seed,
+            "n_layers": n_layers,
+            "ranks": ranks,
+            "target_estimand": TARGET_ESTIMAND,
+            "target_estimand_version": TARGET_ESTIMAND_VERSION,
+            "target_reference": TARGET_REFERENCE,
+            "target_denominator": TARGET_DENOMINATOR,
+            "analysis_plan_version": ANALYSIS_PLAN_VERSION,
+            "target_transform": TARGET_TRANSFORM,
+            "predictor_transform": PREDICTOR_TRANSFORM,
+            "git": git_state(Path(__file__)),
+            "runtime": runtime_versions(),
+        },
+    )
+    write_sha256s(run_dir)
+
+    print(f"wrote {run_dir}")
+    if paths:
         print("figures:")
-        for p in paths:
-            print(f"  {p}")
-    else:
-        print(f"wrote {run_dir}")
+        for path in paths:
+            print(f"  {path}")
     return run_dir
 
 
@@ -432,10 +499,18 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--plot", action="store_true")
+    ap.add_argument(
+        "--write-run-dir",
+        type=Path,
+        help="Write the exact created run directory to this file.",
+    )
     args = ap.parse_args()
     with open(args.config, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
-    run(cfg, do_plot=args.plot)
+    run_dir = run(cfg, do_plot=args.plot)
+    if args.write_run_dir is not None:
+        args.write_run_dir.parent.mkdir(parents=True, exist_ok=True)
+        args.write_run_dir.write_text(str(run_dir.resolve()) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

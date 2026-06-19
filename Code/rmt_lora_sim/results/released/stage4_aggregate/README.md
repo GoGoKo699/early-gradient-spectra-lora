@@ -1,26 +1,19 @@
-# Stage4 released aggregate
+# SUPERSEDED Stage4 aggregate — do not use for publication
 
-This directory is the authoritative compact Stage4 release used by the paper.
+This compact aggregate was generated before the useful-rank estimand was made
+consistent with the manuscript. Its target thresholds and penalties can depend
+on the simulation oracle-loss gap, whereas the paper defines them using the best
+validation loss observed on the tested rank grid.
 
-The paper-facing table in `Paper/tables/stage4_gradient_effective_summary.csv` is generated from:
+It is retained only as historical evidence. It lacks the complete per-seed,
+per-layer, per-rank source rows needed for a publication-grade correction and is
+rejected by `Paper/import_stage4_aggregate.py`.
 
-```text
-stage4_key_table.csv
-```
-
-using the `gradient_effective_rank` predictor.  In the publication configs this predictor is the activation-whitened early-gradient effective rank; raw unwhitened ablations remain in the aggregate as `raw_gradient_*` rows.
-
-Full per-seed Stage4 run directories are intentionally not bundled in the clean release because stale pre-whitening per-seed directories can contradict this aggregate.  To regenerate full runs, execute from `Code/rmt_lora_sim`:
+Generate the replacement from `Code/rmt_lora_sim`:
 
 ```bash
 bash scripts/run_stage4.sh
 ```
 
-then import the fresh aggregate with:
-
-```bash
-cd ../..
-cd Code
-make stage4-to-paper
-make paper
-```
+The replacement release will appear under `runs/stage4_releases/` with raw
+source runs, manifests, and recursive SHA-256 checksums.

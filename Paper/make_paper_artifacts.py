@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 import math
 import re
+import sys
 
 import matplotlib as mpl
 mpl.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42})
@@ -31,6 +32,12 @@ GENERATED = TABLES / "generated"
 FIGURES = PAPER / "figures"
 RMT_RESULTS = CODE / "rmt_lora_sim" / "results" / "released"
 RMT_RUNS_LEGACY = CODE / "rmt_lora_sim" / "runs"
+sys.path.insert(0, str(CODE / "rmt_lora_sim"))
+
+from rmt_lora.targets import (  # noqa: E402
+    TARGET_ESTIMAND_VERSION,
+    validate_target_estimand_frame,
+)
 
 RULE_DISPLAY = {
     "soft_dimension": "soft dimension",
@@ -100,8 +107,21 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _load_stage4_table() -> pd.DataFrame:
+    path = TABLES / "stage4_gradient_effective_summary.csv"
+    frame = pd.read_csv(path)
+    validate_target_estimand_frame(frame, context=str(path))
+    if set(frame["target_estimand_version"].astype(str)) != {TARGET_ESTIMAND_VERSION}:
+        raise ValueError(f"{path} has a non-current Stage4 target version")
+    if set(pd.to_numeric(frame["n_runs"], errors="raise")) != {5}:
+        raise ValueError(f"{path} is not a five-seed publication table")
+    if frame["source_aggregate_sha256"].nunique() != 1:
+        raise ValueError(f"{path} mixes multiple Stage4 source aggregates")
+    return frame
+
+
 def make_stage4_rows() -> None:
-    df = pd.read_csv(TABLES / "stage4_gradient_effective_summary.csv")
+    df = _load_stage4_table()
     lines: list[str] = []
     for ci, condition in enumerate(["hard_knee", "sample_limited"]):
         if ci:
@@ -334,7 +354,7 @@ def make_merge_figure() -> None:
 
 
 def make_stage4_figure() -> None:
-    df = pd.read_csv(TABLES / "stage4_gradient_effective_summary.csv")
+    df = _load_stage4_table()
     df["target_order"] = df["target_display"].map({t: i for i, t in enumerate(TARGET_ORDER)})
     df = df.sort_values(["target_order", "condition"])
     hard = df[df["condition"] == "hard_knee"].sort_values("target_order")

@@ -22,10 +22,11 @@ smoke-transformer:
 	cd transformer && PYTHONPATH=. python3 scripts/run_synthetic_transformer.py --config configs/smoke_modular.yaml
 
 stage4-release-to-paper:
-	cd ../Paper && python3 import_stage4_aggregate.py --aggregate ../Code/rmt_lora_sim/results/released/stage4_aggregate/stage4_key_table.csv
+	@echo "ERROR: bundled Stage4 aggregate is superseded; run rmt_lora_sim/scripts/run_stage4.sh" >&2
+	@false
 
 stage4-to-paper:
-	cd ../Paper && python3 import_stage4_aggregate.py --aggregate ../Code/rmt_lora_sim/runs/stage4_aggregate/stage4_key_table.csv
+	cd ../Paper && python3 import_stage4_aggregate.py
 
 real-lora-to-paper:
 	cd ../Paper && python3 import_real_lora_results.py
@@ -33,7 +34,7 @@ real-lora-to-paper:
 paper-artifacts:
 	cd ../Paper && python3 make_paper_artifacts.py
 
-paper: stage4-release-to-paper real-lora-to-paper paper-artifacts
+paper: stage4-to-paper real-lora-to-paper paper-artifacts
 	cd ../Paper && pdflatex -interaction=nonstopmode paper.tex
 	cd ../Paper && pdflatex -interaction=nonstopmode paper.tex
 	cp ../Paper/paper.pdf ../paper.pdf

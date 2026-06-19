@@ -20,7 +20,18 @@ from rmt_lora.lora_sim import (
     mse_loss,
 )
 from rmt_lora.nulls import bootstrap_edge
+from rmt_lora.provenance import write_json, write_sha256s
 from rmt_lora.spectra import summarize_spectrum
+from rmt_lora.targets import (
+    TARGET_DENOMINATOR,
+    TARGET_ESTIMAND,
+    TARGET_ESTIMAND_VERSION,
+    TARGET_REFERENCE,
+    annotate_observed_best_curves,
+    summarize_observed_best_curve,
+    target_definition_document,
+    validate_target_estimand_frame,
+)
 
 
 def _power2_ceiling(x: int, ranks: list[int]) -> int:
@@ -58,48 +69,42 @@ def _random_spikes(rng: np.random.Generator, max_rank: int) -> tuple[np.ndarray,
 
 def _summarize_layers(df: pd.DataFrame, ranks: list[int], recovery_target: float) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
-    for layer, g in df.groupby("layer"):
-        g = g.sort_values("rank")
-        base = float(g["base_val_loss"].iloc[0])
-        oracle = float(g["oracle_val_loss"].iloc[0])
-        gap = max(base - oracle, 1e-12)
-        min_idx = g["final_val_loss"].idxmin()
-        best = g.loc[min_idx]
-        min_loss = float(best["final_val_loss"])
-        near_threshold = min_loss + 0.02 * gap
-        near = g[g["final_val_loss"] <= near_threshold].sort_values("rank")
-        near_best_rank = int(near["rank"].iloc[0]) if len(near) else int(best["rank"])
-        recovery_threshold = oracle + (1.0 - recovery_target) * gap
-        recovered = g[g["final_val_loss"] <= recovery_threshold].sort_values("rank")
-        recovery_rank = float(recovered["rank"].iloc[0]) if len(recovered) else np.nan
-        det = int(g["gradient_detectable_rank"].iloc[0])
-        pred = _power2_ceiling(det, ranks)
+    for layer, group0 in df.groupby("layer"):
+        group = group0.sort_values("rank").copy()
+        target = summarize_observed_best_curve(
+            group,
+            recovery_targets=[recovery_target],
+            gap_tolerances=[0.02],
+            penalty_lambdas=[],
+        )
+        near_best_rank = target["near_best_rank_gap_0.02"]
+        recovery_rank = target[f"recovery_rank_{recovery_target:g}"]
+        detectable = int(group["gradient_detectable_rank"].iloc[0])
+        predicted = _power2_ceiling(detectable, ranks)
         row: dict[str, Any] = {
             "layer": int(layer),
-            "base_val_loss": base,
-            "oracle_val_loss": oracle,
-            "improvement_gap": gap,
-            "gradient_matrix_mode": str(g["gradient_matrix_mode"].iloc[0]) if "gradient_matrix_mode" in g.columns else "legacy_raw",
-            "gradient_detectable_rank": det,
-            "gradient_stable_rank": float(g["gradient_stable_rank"].iloc[0]),
-            "gradient_effective_rank": float(g["gradient_effective_rank"].iloc[0]),
-            "predicted_rank_from_gradient": pred,
-            "best_rank": int(best["rank"]),
-            "best_val_loss": min_loss,
+            **target,
+            "gradient_matrix_mode": str(group["gradient_matrix_mode"].iloc[0]) if "gradient_matrix_mode" in group.columns else "legacy_raw",
+            "gradient_detectable_rank": detectable,
+            "gradient_stable_rank": float(group["gradient_stable_rank"].iloc[0]),
+            "gradient_effective_rank": float(group["gradient_effective_rank"].iloc[0]),
+            "predicted_rank_from_gradient": predicted,
             "near_best_rank_2pct_gap": near_best_rank,
             "recovery_target": recovery_target,
             "recovery_rank": recovery_rank,
-            "pred_matches_near_best": bool(pred == near_best_rank),
-            "pred_within_factor2_near_best": bool((pred <= 2 * near_best_rank) and (near_best_rank <= 2 * pred)),
-            "true_k_strong": int(g["true_k_strong"].iloc[0]),
-            "spike_peak": float(g["spike_peak"].iloc[0]),
-            "spike_decay": float(g["spike_decay"].iloc[0]),
-            "weak_factor": float(g["weak_factor"].iloc[0]),
+            "pred_matches_near_best": bool(predicted == near_best_rank) if np.isfinite(near_best_rank) else False,
+            "pred_within_factor2_near_best": bool(
+                (predicted <= 2 * near_best_rank) and (near_best_rank <= 2 * predicted)
+            ) if np.isfinite(near_best_rank) else False,
+            "true_k_strong": int(group["true_k_strong"].iloc[0]),
+            "spike_peak": float(group["spike_peak"].iloc[0]),
+            "spike_decay": float(group["spike_decay"].iloc[0]),
+            "weak_factor": float(group["weak_factor"].iloc[0]),
         }
-        if "raw_gradient_effective_rank" in g.columns:
-            raw_det = int(g["raw_gradient_detectable_rank"].iloc[0])
-            raw_eff = float(g["raw_gradient_effective_rank"].iloc[0])
-            raw_stb = float(g["raw_gradient_stable_rank"].iloc[0])
+        if "raw_gradient_effective_rank" in group.columns:
+            raw_det = int(group["raw_gradient_detectable_rank"].iloc[0])
+            raw_eff = float(group["raw_gradient_effective_rank"].iloc[0])
+            raw_stb = float(group["raw_gradient_stable_rank"].iloc[0])
             row.update({
                 "raw_gradient_detectable_rank": raw_det,
                 "raw_gradient_stable_rank": raw_stb,
@@ -108,23 +113,24 @@ def _summarize_layers(df: pd.DataFrame, ranks: list[int], recovery_target: float
                 "predicted_rank_raw_effective": _power2_ceiling(raw_eff, ranks),
                 "predicted_rank_raw_stable": _power2_ceiling(raw_stb, ranks),
             })
-        if "whitened_gradient_effective_rank" in g.columns:
-            wh_det = int(g["whitened_gradient_detectable_rank"].iloc[0])
-            wh_eff = float(g["whitened_gradient_effective_rank"].iloc[0])
-            wh_stb = float(g["whitened_gradient_stable_rank"].iloc[0])
+        if "whitened_gradient_effective_rank" in group.columns:
+            whitened_det = int(group["whitened_gradient_detectable_rank"].iloc[0])
+            whitened_eff = float(group["whitened_gradient_effective_rank"].iloc[0])
+            whitened_stb = float(group["whitened_gradient_stable_rank"].iloc[0])
             row.update({
-                "whitened_gradient_detectable_rank": wh_det,
-                "whitened_gradient_stable_rank": wh_stb,
-                "whitened_gradient_effective_rank": wh_eff,
-                "predicted_rank_whitened_detectable": _power2_ceiling(wh_det, ranks),
-                "predicted_rank_whitened_effective": _power2_ceiling(wh_eff, ranks),
-                "predicted_rank_whitened_stable": _power2_ceiling(wh_stb, ranks),
+                "whitened_gradient_detectable_rank": whitened_det,
+                "whitened_gradient_stable_rank": whitened_stb,
+                "whitened_gradient_effective_rank": whitened_eff,
+                "predicted_rank_whitened_detectable": _power2_ceiling(whitened_det, ranks),
+                "predicted_rank_whitened_effective": _power2_ceiling(whitened_eff, ranks),
+                "predicted_rank_whitened_stable": _power2_ceiling(whitened_stb, ranks),
             })
         rows.append(row)
     return pd.DataFrame(rows)
 
 
 def _ols_table(summary: pd.DataFrame) -> pd.DataFrame:
+    validate_target_estimand_frame(summary, context="legacy layer summary")
     rows = []
     targets = ["best_rank", "near_best_rank_2pct_gap", "recovery_rank"]
     predictors = [
@@ -165,6 +171,10 @@ def _ols_table(summary: pd.DataFrame) -> pd.DataFrame:
             r2 = 1.0 - sse / (sst + 1e-12)
             spearman = float(pd.Series(sub[pred_col]).corr(pd.Series(sub[target]), method="spearman"))
             rows.append({
+                "target_estimand": TARGET_ESTIMAND,
+                "target_estimand_version": TARGET_ESTIMAND_VERSION,
+                "target_reference": TARGET_REFERENCE,
+                "target_denominator": TARGET_DENOMINATOR,
                 "target": target,
                 "predictor": name,
                 "n": int(len(sub)),
@@ -172,7 +182,21 @@ def _ols_table(summary: pd.DataFrame) -> pd.DataFrame:
                 "spearman": spearman,
                 "rmse_log2": float(np.sqrt(sse / len(sub))),
             })
-    out = pd.DataFrame(rows, columns=["target", "predictor", "n", "r2_log2_target", "spearman", "rmse_log2"])
+    out = pd.DataFrame(
+        rows,
+        columns=[
+            "target_estimand",
+            "target_estimand_version",
+            "target_reference",
+            "target_denominator",
+            "target",
+            "predictor",
+            "n",
+            "r2_log2_target",
+            "spearman",
+            "rmse_log2",
+        ],
+    )
     if len(out):
         out = out.sort_values(["target", "r2_log2_target"], ascending=[True, False])
     return out
@@ -339,6 +363,9 @@ def run(config: dict[str, Any], do_plot: bool = False) -> Path:
             })
     write_metrics(rows, run_dir / "metrics.csv")
     df = pd.DataFrame(rows)
+    annotate_observed_best_curves(df).to_csv(
+        run_dir / "target_curve_metrics.csv", index=False
+    )
     summary = _summarize_layers(df, ranks, recovery_target)
     fit = _ols_table(summary)
     summary.to_csv(run_dir / "layer_summary.csv", index=False)
@@ -347,11 +374,14 @@ def run(config: dict[str, Any], do_plot: bool = False) -> Path:
     print(summary[["layer", "gradient_detectable_rank", "predicted_rank_from_gradient", "near_best_rank_2pct_gap", "best_rank", "recovery_rank"]].to_string(index=False))
     print("\nrank-prediction fit:")
     print(fit.to_string(index=False))
+    paths: list[Path] = []
     if do_plot:
         paths = _plot(df, summary, run_dir / "figures")
         print("figures:")
-        for p in paths:
-            print(f"  {p}")
+        for path in paths:
+            print(f"  {path}")
+    write_json(run_dir / "target_definition.json", target_definition_document())
+    write_sha256s(run_dir)
     return run_dir
 
 
