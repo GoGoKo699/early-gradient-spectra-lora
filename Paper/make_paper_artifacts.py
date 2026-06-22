@@ -12,6 +12,9 @@ compiled paper avoids Type 3 fonts.
 from __future__ import annotations
 
 from pathlib import Path
+import argparse
+import hashlib
+import json
 import math
 import re
 import sys
@@ -39,14 +42,6 @@ from rmt_lora.targets import (  # noqa: E402
     validate_target_estimand_frame,
 )
 
-RULE_DISPLAY = {
-    "soft_dimension": "soft dimension",
-    "gradient_norm": "gradient norm",
-    "marginal_gain_soft": "marginal gain soft",
-    "effective_rank": "effective rank",
-    "marginal_gain_edge": "marginal gain edge",
-    "marginal_gain_raw": "marginal gain raw",
-}
 CONDITION_DISPLAY = {"hard_knee": "Hard-knee", "sample_limited": "Sample-limited"}
 TARGET_ORDER = [
     "near-best 0.1 gap",
@@ -56,8 +51,48 @@ TARGET_ORDER = [
     "penalty 0.2",
     "penalty 0.3",
 ]
-TASK_ORDER = ["modular", "assoc"]
-RULE_ORDER = ["soft_dimension", "gradient_norm", "marginal_gain_soft", "effective_rank", "marginal_gain_edge"]
+TRANSFORMER_TABLE_ROOT = TABLES / "transformer_publication"
+TRANSFORMER_PLAN_SHA256 = "89c74a8d3e773cd20950bf2a9854bcdf39cd6f0a38a8eed78ca0d3345c85be6d"
+TRANSFORMER_PLAN_VERSION = "transformer_publication_plan_v1"
+TRANSFORMER_PROTOCOL = "synthetic_transformer_publication_protocol_v4"
+TRANSFORMER_RELEASE_ID = "transformer_publication_20260622T101458Z"
+TRANSFORMER_ARCHIVE_SHA256 = "b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3"
+TRANSFORMER_PROVENANCE_COLUMNS = (
+    "source_release_id",
+    "source_archive_sha256",
+    "analysis_plan_sha256",
+    "analysis_plan_version",
+    "protocol_version",
+)
+TRANSFORMER_OUTPUT_FILES = {
+    "primary": "primary_analysis.csv",
+    "by_task": "primary_analysis_by_task.csv",
+    "run_deltas": "primary_run_deltas.csv",
+    "scaling": "scaling_sensitivity.csv",
+    "site": "site_prediction_selected.csv",
+}
+TRANSFORMER_TASK_DISPLAY = {
+    "associative_recall": "Associative recall",
+    "modular": "Modular arithmetic",
+}
+TRANSFORMER_SCALING_DISPLAY = {
+    "fixed_update_scale": r"Fixed update scale",
+    "standard": r"Standard $\alpha/r$",
+    "rslora": r"rsLoRA",
+}
+TRANSFORMER_PREDICTOR_DISPLAY = {
+    "effective_rank": "Effective rank",
+    "soft_dimension": "Soft dimension",
+}
+ROW_END = r" \\"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _ensure_dirs() -> None:
@@ -78,8 +113,7 @@ def _tex_escape(text: object) -> str:
 def _fmt(x: float, digits: int = 4, signed: bool = False) -> str:
     if pd.isna(x):
         return "--"
-    spec = f"{x:+.{digits}f}" if signed else f"{x:.{digits}f}"
-    return spec.format(x=x) if False else format(float(x), f"+.{digits}f" if signed else f".{digits}f")
+    return format(float(x), f"+.{digits}f" if signed else f".{digits}f")
 
 
 def _sem(series: pd.Series) -> float:
@@ -138,109 +172,333 @@ def make_stage4_rows() -> None:
     _write(GENERATED / "stage4_rows.tex", "\n".join(lines) + "\n")
 
 
-def make_transformer_rows() -> None:
-    per = pd.read_csv(TABLES / "per_run_rule_summary.csv")
-    low = pd.read_csv(TABLES / "low_budget_by_rule_summary.csv")
-    merged = per.merge(low[["rule", "wins", "mean_loss_delta"]], on="rule", suffixes=("", "_low"))
-    merged = merged[merged["rule"].isin(RULE_ORDER)].copy()
-    order = {r: i for i, r in enumerate(RULE_ORDER)}
-    merged["order"] = merged["rule"].map(order).fillna(99)
-    merged = merged.sort_values("order")
-    lines = []
-    for _, row in merged.iterrows():
-        lines.append(
-            f"{RULE_DISPLAY.get(row['rule'], row['rule'])} & "
-            f"${_fmt(row['mean_loss_delta'], 4, signed=True)}$ & "
-            f"${int(row['wins'])}$ & "
-            f"${_fmt(row['mean_loss_delta_low'], 4, signed=True)}$ & "
-            f"${int(row['wins_low'])}$ & "
-            f"${_fmt(row['mean_acc_delta'], 4, signed=True)}$ \\\\" 
-        )
-    _write(GENERATED / "transformer_allocation_rows.tex", "\n".join(lines) + "\n")
+def _load_transformer_publication_tables() -> dict[str, pd.DataFrame]:
+    """Load only checksum-bound tables produced by the post-CRN importer."""
 
-
-def make_transformer_cluster_summary() -> None:
-    df = pd.read_csv(TABLES / "combined_per_run_deltas.csv")
-    rules = [r for r in RULE_ORDER if r in set(df["rule"])]
-    run_rule = (
-        df[df["rule"].isin(rules)]
-        .groupby(["task", "run", "seed", "rule"], as_index=False)
-        .agg(
-            mean_loss_delta=("loss_delta_vs_uniform_fill", "mean"),
-            wins=("loss_delta_vs_uniform_fill", lambda x: int((x < 0).sum())),
-            n=("loss_delta_vs_uniform_fill", "size"),
-            mean_acc_delta=("acc_delta_vs_uniform_fill", "mean"),
+    source_path = TRANSFORMER_TABLE_ROOT / "source.json"
+    if not source_path.is_file():
+        raise FileNotFoundError(
+            f"missing {source_path}; run Paper/import_transformer_publication.py first"
         )
-    )
-    cluster = (
-        run_rule.groupby("rule", as_index=False)
-        .agg(
-            n_run_clusters=("mean_loss_delta", "size"),
-            clusters_better=("mean_loss_delta", lambda x: int((x < 0).sum())),
-            mean_cluster_loss_delta=("mean_loss_delta", "mean"),
-            sem_cluster_loss_delta=("mean_loss_delta", _sem),
-            median_cluster_loss_delta=("mean_loss_delta", "median"),
-            mean_cluster_acc_delta=("mean_acc_delta", "mean"),
-        )
-    )
-    cluster["order"] = cluster["rule"].map({r: i for i, r in enumerate(RULE_ORDER)}).fillna(99)
-    cluster = cluster.sort_values("order").drop(columns="order")
-    cluster.to_csv(TABLES / "transformer_cluster_summary.csv", index=False)
-    lines = []
-    for _, row in cluster.iterrows():
-        lines.append(
-            f"{RULE_DISPLAY.get(row['rule'], row['rule'])} & "
-            f"${_fmt(row['mean_cluster_loss_delta'], 4, signed=True)}$ & "
-            f"${_fmt(row['sem_cluster_loss_delta'], 4)}$ & "
-            f"${int(row['clusters_better'])}/{int(row['n_run_clusters'])}$ \\\\" 
-        )
-    _write(GENERATED / "transformer_cluster_rows.tex", "\n".join(lines) + "\n")
+    source = json.loads(source_path.read_text(encoding="utf-8"))
+    if not isinstance(source, dict):
+        raise ValueError(f"{source_path} must contain a JSON object")
 
-
-def make_by_task_rows() -> None:
-    df = pd.read_csv(TABLES / "by_task_rule_summary.csv")
-    order = {r: i for i, r in enumerate(RULE_ORDER)}
-    task_display = {"modular": "Modular", "assoc": "Associative recall"}
-    lines = []
-    for ti, task in enumerate(TASK_ORDER):
-        if ti:
-            lines.append(r"\midrule")
-        sub = df[(df["task"] == task) & (df["rule"].isin(RULE_ORDER))].copy()
-        sub["order"] = sub["rule"].map(order).fillna(99)
-        sub = sub.sort_values("order")
-        for _, row in sub.iterrows():
-            lines.append(
-                f"{task_display.get(task, task)} & {RULE_DISPLAY.get(row['rule'], row['rule'])} & "
-                f"${_fmt(row['mean_loss_delta'], 4, signed=True)}$ & "
-                f"${int(row['budgets_better'])}/{int(row['n_budgets'])}$ & "
-                f"${_fmt(row['mean_acc_delta'], 4, signed=True)}$ & "
-                f"${_fmt(row['mean_loss_ratio'], 3)}$ \\\\" 
+    expected_source = {
+        "source_release_id": TRANSFORMER_RELEASE_ID,
+        "source_archive_sha256": TRANSFORMER_ARCHIVE_SHA256,
+        "analysis_plan_sha256": TRANSFORMER_PLAN_SHA256,
+        "analysis_plan_version": TRANSFORMER_PLAN_VERSION,
+        "protocol_version": TRANSFORMER_PROTOCOL,
+        "n_recursive_checksums": 350,
+        "n_source_runs": 10,
+        "n_exact_candidate_pairs": 2925,
+        "n_identical_allocation_groups": 819,
+        "max_identical_metric_spread": 0.0,
+        "max_identical_seed_disagreement": 0,
+        "n_diverged_rows": 0,
+        "primary_run_wins": 3,
+        "primary_task_wins": 0,
+        "importer": "import_transformer_publication.py",
+    }
+    for key, expected in expected_source.items():
+        observed = source.get(key)
+        if isinstance(expected, float):
+            if not math.isclose(float(observed), expected, rel_tol=0.0, abs_tol=0.0):
+                raise ValueError(
+                    f"{source_path}: {key}={observed!r}; expected {expected!r}"
+                )
+        elif observed != expected:
+            raise ValueError(
+                f"{source_path}: {key}={observed!r}; expected {expected!r}"
             )
-    _write(GENERATED / "by_task_transformer_rows.tex", "\n".join(lines) + "\n")
 
+    expected_primary = {
+        "primary_mean_loss_delta": 0.014638354179882738,
+        "primary_exact_sign_flip_p_two_sided": 0.240234375,
+    }
+    for key, expected in expected_primary.items():
+        if not math.isclose(
+            float(source.get(key)), expected, rel_tol=0.0, abs_tol=1e-12
+        ):
+            raise ValueError(f"{source_path}: {key} disagrees with the verified release")
+    interval = source.get("primary_cluster_bootstrap_ci")
+    if not isinstance(interval, list) or len(interval) != 2:
+        raise ValueError(f"{source_path} lacks the primary bootstrap interval")
+    for observed, expected in zip(
+        interval, (-0.007750680089594088, 0.03521469451846864)
+    ):
+        if not math.isclose(float(observed), expected, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError(f"{source_path}: primary interval disagrees with release")
 
-def make_whitening_rows() -> None:
-    df = pd.read_csv(TABLES / "combined_whitening_summary.csv").sort_values("mean_loss_delta")
-    low = pd.read_csv(TABLES / "combined_whitening_low_budget_summary.csv")[["label", "mean_loss_delta", "wins"]]
-    merged = df.merge(low, on="label", suffixes=("", "_low"), how="left")
-    lines = []
-    for _, row in merged.iterrows():
-        w = "--" if row["whitening"] == "baseline" else str(row["whitening"])
-        lines.append(
-            f"{RULE_DISPLAY.get(row['rule'], row['rule'])} & {_tex_escape(w)} & "
-            f"${_fmt(row['mean_loss_delta'], 4, signed=True)}$ & "
-            f"${int(row['wins'])}$ & "
-            f"${_fmt(row['mean_loss_delta_low'], 4, signed=True)}$ & "
-            f"${int(row['wins_low'])}$ & "
-            f"${_fmt(row['mean_acc_delta'], 4, signed=True)}$ \\\\" 
+    output_manifest = source.get("outputs")
+    if not isinstance(output_manifest, dict):
+        raise ValueError(f"{source_path} lacks paper-output checksums")
+    expected_names = set(TRANSFORMER_OUTPUT_FILES.values())
+    observed_names = {path.name for path in TRANSFORMER_TABLE_ROOT.glob("*.csv")}
+    if observed_names != expected_names:
+        raise ValueError(
+            "transformer publication table set is not exact; "
+            f"unexpected={sorted(observed_names - expected_names)}, "
+            f"missing={sorted(expected_names - observed_names)}"
         )
-    _write(GENERATED / "whitening_rows.tex", "\n".join(lines) + "\n")
+
+    frames: dict[str, pd.DataFrame] = {}
+    expected_provenance = {
+        "source_release_id": TRANSFORMER_RELEASE_ID,
+        "source_archive_sha256": TRANSFORMER_ARCHIVE_SHA256,
+        "analysis_plan_sha256": TRANSFORMER_PLAN_SHA256,
+        "analysis_plan_version": TRANSFORMER_PLAN_VERSION,
+        "protocol_version": TRANSFORMER_PROTOCOL,
+    }
+    for key, filename in TRANSFORMER_OUTPUT_FILES.items():
+        path = TRANSFORMER_TABLE_ROOT / filename
+        record = output_manifest.get(filename)
+        if not isinstance(record, dict):
+            raise ValueError(f"{source_path} lacks output record {filename!r}")
+        if record.get("relative_path") != path.relative_to(PAPER).as_posix():
+            raise ValueError(f"{source_path} records the wrong path for {filename}")
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"missing {path}; run Paper/import_transformer_publication.py first"
+            )
+        if _sha256(path) != record.get("sha256"):
+            raise ValueError(f"paper transformer table checksum mismatch: {path}")
+        frame = pd.read_csv(path)
+        if frame.empty or int(record.get("rows", -1)) != len(frame):
+            raise ValueError(f"{path} is empty or its recorded row count is stale")
+        missing = sorted(set(TRANSFORMER_PROVENANCE_COLUMNS) - set(frame.columns))
+        if missing:
+            raise ValueError(f"{path} lacks provenance columns {missing}")
+        for column, expected in expected_provenance.items():
+            values = set(frame[column].dropna().astype(str))
+            if values != {str(expected)}:
+                raise ValueError(f"{path} has mixed or stale {column}: {values}")
+        frames[key] = frame
+
+    primary = frames["primary"]
+    if len(primary) != 1:
+        raise ValueError("transformer primary table must contain exactly one row")
+    row = primary.iloc[0]
+    required_primary = {
+        "analysis_scope": "task_stratified_omnibus",
+        "task_weighting": "equal_weight_across_task_families",
+        "generalization_scope": "conditional_on_prespecified_task_families",
+        "scaling_mode": "fixed_update_scale",
+        "allocation_rule": "soft_dimension",
+        "reference_rule": "uniform_exact_cost",
+        "metric": "final_val_loss",
+    }
+    for column, expected in required_primary.items():
+        if str(row[column]) != expected:
+            raise ValueError(f"primary {column}={row[column]!r}; expected {expected!r}")
+    for column, expected in {
+        "n_task_families": 2,
+        "n_independent_runs": 10,
+        "min_runs_per_task": 5,
+        "max_runs_per_task": 5,
+        "run_wins_loss": 3,
+        "task_wins_loss": 0,
+    }.items():
+        if int(row[column]) != expected:
+            raise ValueError(f"primary {column}={row[column]!r}; expected {expected}")
+    for column, expected in {
+        "mean_loss_delta": expected_primary["primary_mean_loss_delta"],
+        "cluster_bootstrap_ci_low": float(interval[0]),
+        "cluster_bootstrap_ci_high": float(interval[1]),
+        "exact_sign_flip_p_two_sided": expected_primary[
+            "primary_exact_sign_flip_p_two_sided"
+        ],
+        "mean_accuracy_delta": -0.0039236059494904465,
+    }.items():
+        if not math.isclose(float(row[column]), expected, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError(f"primary {column} disagrees with {source_path}")
+
+    by_task = frames["by_task"]
+    if len(by_task) != 2 or set(by_task["task_family"].astype(str)) != set(
+        TRANSFORMER_TASK_DISPLAY
+    ):
+        raise ValueError("transformer task table is incomplete")
+    if set(pd.to_numeric(by_task["n_independent_runs"], errors="raise")) != {5}:
+        raise ValueError("each transformer task must contain five independent runs")
+
+    runs = frames["run_deltas"]
+    observed_units = set(
+        zip(
+            runs["task_family"].astype(str),
+            pd.to_numeric(runs["seed"], errors="raise").astype(int),
+        )
+    )
+    expected_units = {
+        (task, seed)
+        for task in TRANSFORMER_TASK_DISPLAY
+        for seed in (101, 103, 107, 109, 113)
+    }
+    if len(runs) != 10 or observed_units != expected_units:
+        raise ValueError("transformer run table differs from the frozen design")
+    if not np.allclose(
+        pd.to_numeric(runs["mean_adaptation_replicates"], errors="raise"), 3.0
+    ):
+        raise ValueError("run summaries must average three adaptation replicates")
+
+    scaling = frames["scaling"]
+    if len(scaling) != 3 or set(scaling["scaling_mode"].astype(str)) != set(
+        TRANSFORMER_SCALING_DISPLAY
+    ):
+        raise ValueError("transformer scaling table is incomplete")
+    fixed = scaling[scaling["scaling_mode"].astype(str).eq("fixed_update_scale")]
+    if len(fixed) != 1 or str(fixed.iloc[0]["analysis_role"]) != "confirmatory_primary":
+        raise ValueError("fixed-update-scale row is not marked as confirmatory")
+
+    site = frames["site"]
+    expected_site = {
+        (task, predictor)
+        for task in TRANSFORMER_TASK_DISPLAY
+        for predictor in TRANSFORMER_PREDICTOR_DISPLAY
+    }
+    observed_site = set(
+        zip(site["task_family"].astype(str), site["predictor"].astype(str))
+    )
+    if len(site) != 4 or observed_site != expected_site:
+        raise ValueError("transformer site-prediction table is incomplete")
+    if set(site["scaling_mode"].astype(str)) != {"fixed_update_scale"}:
+        raise ValueError("transformer site-prediction table is not fixed-scale")
+    if set(site["target"].astype(str)) != {"near_best_rank_gap_0.1"}:
+        raise ValueError("transformer site table uses the wrong useful-rank target")
+
+    return frames
+
+
+def _latex_row(*cells: object) -> str:
+    return " & ".join(str(cell) for cell in cells) + ROW_END
+
+
+def make_transformer_publication_rows() -> None:
+    frames = _load_transformer_publication_tables()
+    primary = frames["primary"].iloc[0]
+    by_task = frames["by_task"]
+
+    rows: list[str] = [
+        _latex_row(
+            "Omnibus (equal task weight)",
+            int(primary["n_independent_runs"]),
+            f"${_fmt(primary['mean_loss_delta'], 4, signed=True)}$",
+            f"$[{_fmt(primary['cluster_bootstrap_ci_low'], 4, signed=True)},\\,{_fmt(primary['cluster_bootstrap_ci_high'], 4, signed=True)}]$",
+            f"${_fmt(primary['exact_sign_flip_p_two_sided'], 4)}$",
+            f"${int(primary['run_wins_loss'])}/{int(primary['n_independent_runs'])}$",
+            f"${_fmt(primary['mean_accuracy_delta'], 4, signed=True)}$",
+        )
+    ]
+    for task in ("associative_recall", "modular"):
+        row = by_task[by_task["task_family"].astype(str).eq(task)].iloc[0]
+        rows.append(
+            _latex_row(
+                TRANSFORMER_TASK_DISPLAY[task],
+                int(row["n_independent_runs"]),
+                f"${_fmt(row['mean_loss_delta'], 4, signed=True)}$",
+                f"$[{_fmt(row['cluster_bootstrap_ci_low'], 4, signed=True)},\\,{_fmt(row['cluster_bootstrap_ci_high'], 4, signed=True)}]$",
+                f"${_fmt(row['exact_sign_flip_p_two_sided'], 4)}$",
+                f"${int(row['run_wins_loss'])}/{int(row['n_independent_runs'])}$",
+                f"${_fmt(row['mean_accuracy_delta'], 4, signed=True)}$",
+            )
+        )
+    _write(GENERATED / "transformer_primary_rows.tex", "\n".join(rows) + "\n")
+
+    scaling = frames["scaling"].copy()
+    scaling["_order"] = scaling["scaling_mode"].map(
+        {"fixed_update_scale": 0, "standard": 1, "rslora": 2}
+    )
+    scaling = scaling.sort_values("_order")
+    rows = []
+    for _, row in scaling.iterrows():
+        role = "Primary" if row["analysis_role"] == "confirmatory_primary" else "Exploratory"
+        rows.append(
+            _latex_row(
+                TRANSFORMER_SCALING_DISPLAY[str(row["scaling_mode"])],
+                role,
+                f"${_fmt(row['mean_loss_delta'], 4, signed=True)}$",
+                f"${_fmt(row['exact_sign_flip_p_two_sided'], 4)}$",
+                f"${int(row['run_wins_loss'])}/{int(row['n_independent_runs'])}$",
+                f"${_fmt(row['associative_recall_mean_loss_delta'], 4, signed=True)}$",
+                f"${_fmt(row['modular_mean_loss_delta'], 4, signed=True)}$",
+            )
+        )
+    _write(GENERATED / "transformer_scaling_rows.tex", "\n".join(rows) + "\n")
+
+    site = frames["site"].copy()
+    site["_task_order"] = site["task_family"].map(
+        {"associative_recall": 0, "modular": 1}
+    )
+    site["_predictor_order"] = site["predictor"].map(
+        {"effective_rank": 0, "soft_dimension": 1}
+    )
+    site = site.sort_values(["_task_order", "_predictor_order"])
+    rows = []
+    previous_task: str | None = None
+    for _, row in site.iterrows():
+        task = str(row["task_family"])
+        if previous_task is not None and task != previous_task:
+            rows.append(r"\midrule")
+        rows.append(
+            _latex_row(
+                TRANSFORMER_TASK_DISPLAY[task],
+                TRANSFORMER_PREDICTOR_DISPLAY[str(row["predictor"])],
+                f"${_fmt(row['mean_spearman'], 3, signed=True)}$",
+                f"${_fmt(row['sem_spearman'], 3)}$",
+            )
+        )
+        previous_task = task
+    _write(GENERATED / "transformer_sitewise_rows.tex", "\n".join(rows) + "\n")
+
+
+def make_transformer_publication_figure() -> None:
+    frames = _load_transformer_publication_tables()
+    runs = frames["run_deltas"].copy()
+    task_order = ("associative_recall", "modular")
+    runs["_task_order"] = runs["task_family"].map(
+        {task: index for index, task in enumerate(task_order)}
+    )
+    runs = runs.sort_values(["_task_order", "seed"]).reset_index(drop=True)
+    x = np.arange(len(runs), dtype=float)
+    values = runs["loss_delta_vs_exact_uniform"].to_numpy(dtype=float)
+
+    fig, ax = plt.subplots(figsize=(5.3, 2.55))
+    for task in task_order:
+        mask = runs["task_family"].astype(str).eq(task).to_numpy()
+        positions = x[mask]
+        task_values = values[mask]
+        ax.scatter(positions, task_values, label=TRANSFORMER_TASK_DISPLAY[task], zorder=3)
+        ax.hlines(
+            float(np.mean(task_values)),
+            float(positions.min()) - 0.35,
+            float(positions.max()) + 0.35,
+            linestyles=":",
+            linewidth=1.2,
+        )
+    ax.axhline(0.0, linestyle="--", linewidth=0.9)
+    ax.set_xticks(x)
+    ax.set_xticklabels(
+        [
+            ("AR" if task == "associative_recall" else "Mod") + f" {int(seed)}"
+            for task, seed in zip(runs["task_family"], runs["seed"])
+        ],
+        rotation=35,
+        ha="right",
+    )
+    ax.set_ylabel(r"loss $\Delta$: soft dimension $-$ exact uniform")
+    ax.set_title("Confirmatory transformer run deltas")
+    ax.legend(fontsize=7, ncol=2)
+    _save(fig, FIGURES / "transformer_primary_run_deltas.pdf")
 
 
 def _save(fig: plt.Figure, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
-    fig.savefig(path, bbox_inches="tight")
+    fig.savefig(
+        path,
+        bbox_inches="tight",
+        metadata={"CreationDate": None, "ModDate": None},
+    )
     plt.close(fig)
 
 
@@ -375,18 +633,31 @@ def make_stage4_figure() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Validate or regenerate paper-facing tables and vector figures."
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate Stage4 and transformer paper inputs without writing artifacts.",
+    )
+    args = parser.parse_args()
+    if args.validate_only:
+        _load_stage4_table()
+        _load_transformer_publication_tables()
+        print("paper artifact input validation: PASS")
+        return
+
     _ensure_dirs()
     make_stage4_rows()
-    make_transformer_rows()
-    make_transformer_cluster_summary()
-    make_by_task_rows()
-    make_whitening_rows()
+    make_transformer_publication_rows()
     make_bbp_figures()
     make_lora_rank_figures()
     make_alpha_figure()
     make_merge_figure()
     make_stage4_figure()
-    print("wrote generated paper tables and Type-42 PDF figures")
+    make_transformer_publication_figure()
+    print("wrote validated paper tables and deterministic Type-42 PDF figures")
 
 
 if __name__ == "__main__":

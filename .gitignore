@@ -15,3 +15,5 @@ __pycache__/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+# In-tree manuscript build copy; the release artifact is /paper.pdf
+/Paper/paper.pdf

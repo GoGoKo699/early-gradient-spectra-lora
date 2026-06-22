@@ -1,4 +1,7 @@
-.PHONY: stage4-to-paper stage4-release-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer smoke-transformer-scaling smoke-transformer-publication transformer-publication real-lora-to-paper paper-artifacts paper clean-paper
+.PHONY: stage4-to-paper stage4-release-to-paper transformer-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer smoke-transformer-scaling smoke-transformer-publication transformer-publication real-lora-to-paper paper-artifacts paper clean-paper
+
+SOURCE_DATE_EPOCH ?= 1782123298
+PDF_ENV = SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) FORCE_SOURCE_DATE=1
 
 RMT_SMOKE_CFG = configs/smoke
 
@@ -37,15 +40,18 @@ stage4-release-to-paper:
 stage4-to-paper:
 	cd ../Paper && python3 import_stage4_aggregate.py
 
+transformer-to-paper:
+	cd ../Paper && python3 import_transformer_publication.py
+
 real-lora-to-paper:
 	cd ../Paper && python3 import_real_lora_results.py
 
 paper-artifacts:
 	cd ../Paper && python3 make_paper_artifacts.py
 
-paper: stage4-to-paper real-lora-to-paper paper-artifacts
-	cd ../Paper && pdflatex -interaction=nonstopmode paper.tex
-	cd ../Paper && pdflatex -interaction=nonstopmode paper.tex
+paper: stage4-to-paper transformer-to-paper real-lora-to-paper paper-artifacts
+	cd ../Paper && $(PDF_ENV) pdflatex -interaction=nonstopmode -halt-on-error paper.tex
+	cd ../Paper && $(PDF_ENV) pdflatex -interaction=nonstopmode -halt-on-error paper.tex
 	cp ../Paper/paper.pdf ../paper.pdf
 
 clean-paper:

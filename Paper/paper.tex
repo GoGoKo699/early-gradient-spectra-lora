@@ -6,6 +6,7 @@
 \usepackage{booktabs}
 \usepackage{enumitem}
 \usepackage{xcolor}
+\usepackage{float}
 \usepackage{hyperref}
 \usepackage[nameinlink,capitalise]{cleveref}
 \usepackage{microtype}
@@ -15,6 +16,9 @@
 
 \graphicspath{{figures/}}
 \hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black, urlcolor=blue!60!black}
+\setcounter{dbltopnumber}{3}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
 
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{proposition}[theorem]{Proposition}
@@ -50,11 +54,11 @@
 
 
 \begin{abstract}
-LoRA and related PEFT methods expose a nominal rank, but the rank that is actually useful depends on the task spectrum seen through the model's activations.  We study this with a reduced-rank adaptation model and controlled synthetic experiments.  For a frozen map with activation covariance $C$ and task update $\Delta_\star$, the best rank-$r$ adapter is the truncated SVD of $M_\star=\Delta_\star C^{1/2}$, and its excess risk is $\frac12\sum_{i>r}\sigma_i^2(M_\star)$.  Moreover, the population early gradient, after activation whitening, has exactly this spectrum.  Thus early-gradient spectra can predict useful adapter rank before training.  We evaluate this prediction in multi-seed matrix simulations using useful-rank targets normalized by the best validation loss observed on the tested rank grid; the simulation oracle is diagnostic and does not set any target.  We then implement the estimator in small transformer modules on synthetic modular-arithmetic and associative-recall adaptation tasks.  Across six run-level clusters (three seeds per task, yielding 39 descriptive task-budget evaluations per rule), early-gradient allocation rules outperform a fair uniform-fill LoRA rank baseline on most budgets; the strongest spectral allocator, a soft-threshold spectral dimension, improves validation loss by $0.107$ on average, wins on $33/39$ descriptive task-budget cases, and has negative mean loss delta in $5/6$ run clusters.  A whitening ablation shows that activation weighting is important for effective rank, while soft-threshold dimensions are robust across whitening choices.  The results support a cautious claim: early-gradient spectra identify useful low-rank task directions and provide practical signals for where LoRA rank should be spent.  A small fixed-scale GPT-2/Wikitext-2 validation gives a limited real-model check: spectral-effective allocation has a small mean advantage over uniform rank 4 in a restricted target-module setting, while an attention-output projection ablation exposes a module-family boundary condition.
+LoRA and related PEFT methods expose a nominal rank, but useful rank depends on the task spectrum seen through the model's activations.  For a frozen linear map with activation covariance $C$ and task update $\Delta_\star$, we show that the best rank-$r$ adapter is the truncated SVD of $M_\star=\Delta_\star C^{1/2}$ and has excess risk $\frac12\sum_{i>r}\sigma_i^2(M_\star)$.  The activation-whitened population gradient at the frozen model has exactly this spectrum, making early-gradient spectra candidates for predicting useful adapter rank before training.  In five-seed matrix simulations, activation-whitened gradient effective rank predicts a prespecified near-best useful-rank target with mean $R^2=0.777$ and mean Spearman correlation $0.852$ in a hard-knee regime; the corresponding sample-limited values are $0.687$ and $0.786$.  We then test the stronger extrapolation from rank prediction to cross-module rank allocation in a prespecified synthetic-transformer study: two task families, five independent base-model seeds per task, three adaptation replicates, common random numbers, exact-cost uniform comparators, and fixed update scale as the primary condition.  For soft spectral dimension versus exact-cost uniform allocation, the equal-task-weighted final-validation-loss difference (candidate minus baseline) is $+0.0146$ with a 95\% task-stratified bootstrap interval $[-0.0078,0.0352]$ and exact two-sided sign-flip $p=0.2402$; the candidate wins 3 of 10 runs and neither task-family mean.  Thus the confirmatory transformer experiment does not support a general allocation advantage.  Exploratory standard-$\alpha/r$ scaling changes the direction but remains uncertain, exposing rank--scale sensitivity.  A small GPT-2/Wikitext-2 experiment is retained only as a descriptive real-model check.  The supported conclusion is narrower: early-gradient spectra predict useful rank in the reduced-rank model and controlled matrix simulations, while a universal module allocator is not established.
 \end{abstract}
 
 \paragraph{Scope and claim boundary.}
-Most experiments are synthetic and theorem-driven; the final validation uses GPT-2 on Wikitext-2 as a small real pretrained-transformer check.  We do not claim that nominal rank predicts performance, that the unconstrained best rank is predictable, that any single spectral rule dominates all baselines, or that the present theory proves nonlinear transformer convergence.  The intended contribution is a principled spectral predictor of useful rank and controlled evidence that it yields useful rank-allocation signals in matrix, synthetic-transformer, and one small real-transformer setting.
+Most evidence is theorem-driven and synthetic.  The central empirical claim is useful-rank prediction in matrix simulations, not universal rank allocation in transformers.  The corrected synthetic-transformer experiment is a controlled boundary test and yields a null confirmatory result under its primary fixed-scale condition.  The GPT-2/Wikitext-2 study is small and descriptive.  We do not claim nonlinear transformer convergence, broad task generalization, or dominance of any spectral allocator over exact-cost uniform or gradient-based baselines.
 
 % -----------------------------------------------------------------------------
 \section{Introduction}
@@ -72,7 +76,7 @@ We separate \emph{nominal rank} from \emph{useful rank}.  Nominal rank is the al
 \end{equation}
 This activation weighting discounts update directions that the model rarely uses.
 
-We prove two exact population statements in a reduced-rank adaptation model.  First, the best rank-$r$ adapter is obtained by truncating the singular spectrum of $M_\star$.  Second, the early full gradient at the frozen model, after activation whitening, equals $-M_\star$.  Therefore, the useful-rank spectrum is visible before training an adapter.  We test this idea in controlled matrix simulations and then in small synthetic transformer modules.  The transformer experiments show that early-gradient spectral statistics are useful not only for predicting rank in an isolated matrix problem, but also for deciding where a limited LoRA rank budget should be spent across attention and MLP modules.
+We prove two exact population statements in a reduced-rank adaptation model.  First, the best rank-$r$ adapter is obtained by truncating the singular spectrum of $M_\star$.  Second, the early full gradient at the frozen model, after activation whitening, equals $-M_\star$.  Therefore, the useful-rank spectrum is visible before training an adapter.  We validate this prediction in controlled matrix simulations.  We then test a stronger, non-equivalent hypothesis: whether a scalar spectral score can allocate a fixed LoRA parameter budget across transformer modules.  A prespecified ten-run study with exact-cost comparators and common random numbers does not show a confirmatory advantage for the primary spectral allocator, and sitewise score--rank relationships reverse sign across the two task families.  This negative bridge result is informative because it separates theorem-supported rank prediction from a practical allocation heuristic that requires further structure.
 
 \paragraph{Contributions.}
 \begin{enumerate}[leftmargin=1.4em,itemsep=1pt]
@@ -80,8 +84,8 @@ We prove two exact population statements in a reduced-rank adaptation model.  Fi
     \item We show that the activation-whitened population early gradient has the same spectrum as this task operator.
     \item We define useful-rank targets--near-best, recovery, and penalized rank--that avoid the degeneracy of unconstrained best rank.
     \item We validate useful-rank prediction in multi-seed spiked matrix simulations, where gradient effective rank strongly predicts practical rank targets.
-    \item We implement the estimator in small transformer modules and show that early-gradient allocation rules beat fair uniform-fill LoRA rank allocation across synthetic modular-arithmetic and associative-recall adaptation tasks, with whitening ablations supporting the activation-weighted view.
-    \item We add a small real GPT-2/Wikitext-2 validation showing a small descriptive mean advantage over uniform rank 4 and a larger advantage over gradient norm in a restricted target-module setting, while an attention-output projection ablation reveals a boundary condition.
+    \item We conduct a prespecified synthetic-transformer allocation study with ten independent task--seed runs, exact-cost baselines, common random numbers, three adaptation replicates, and explicit scaling controls; its null confirmatory result identifies a boundary between rank prediction and module allocation.
+    \item We retain a small GPT-2/Wikitext-2 experiment as a descriptive real-model check and state its module-family and stochastic-control limitations explicitly.
 \end{enumerate}
 
 % -----------------------------------------------------------------------------
@@ -177,6 +181,8 @@ Merge/conflict & paired task vectors & overlap/sign sweeps & test signed versus 
 Layerwise hard-knee & 48 synthetic layers & ranks $1$--$32$ & test early-gradient useful-rank prediction \\
 Layerwise sample-limited & fewer samples and more noise & ranks $1$--$32$ & test finite-sample degradation \\
 Stage4 replication & 5 seeds $\times$ 2 regimes & 48 layers per seed & multi-seed validation \\
+Synthetic transformer & 2 tasks $\times$ 5 seeds; 3 adaptation replicates & ranks $0$--$16$, 3 scale rules, exact-cost budgets & test whether spectral rank demand transfers to module allocation \\
+GPT-2/Wikitext-2 & small local pretrained-model check & fixed-scale restricted module families & descriptive transfer and boundary test \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -235,116 +241,101 @@ The main matrix-simulation evidence is the Stage4 replication: five seeds per co
 \label{fig:stage4}
 \end{figure}
 
-\begin{table*}[t]
+\begin{table}[H]
 \centering
-\small
-\caption{Stage4 results for activation-whitened gradient effective rank.  Mean over five seeds; SEM in parentheses.}
+\scriptsize
+\setlength{\tabcolsep}{2.4pt}
+\caption{Stage4 activation-whitened effective-rank results.  Mean over five seeds; SEM in parentheses.}
 \label{tab:stage4}
-\begin{tabular}{llrr}
+\begin{tabular}{@{}llcc@{}}
 \toprule
-Condition & Target & Mean $R^2$ & Mean Spearman \\
+Condition & Target & Mean $R^2$ & Mean $\rho$ \\
 \midrule
 \input{tables/generated/stage4_rows.tex}\\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 The hard-knee regime uses $n_{train}=1024$, label noise $0.05$, and weak-factor range $0.01$--$0.08$.  The sample-limited regime uses $n_{train}=384$, label noise $0.12$, and weak-factor range $0.05$--$0.25$.  The unconstrained best rank is degenerate: rank 32 is best for almost every layer.  Useful-rank targets are nondegenerate and predictable.
 
 \FloatBarrier
 
 % -----------------------------------------------------------------------------
-\section{Synthetic-Transformer Module Experiments}
+\section{Synthetic-Transformer Allocation Test}
 \label{sec:transformer-results}
 
-We next test whether the spectral objects above are useful inside actual transformer modules.  The data remain fully synthetic, so the setting is controlled and reproducible.  Each experiment trains a small two-layer decoder-only transformer on a base sequence task, freezes it, and adapts to a shifted task using LoRA.  The model uses $d_{\rm model}=64$, four attention heads, MLP width $128$, and no dropout.  Candidate adapter sites are attention projections and MLP output projections.
+We next test a stronger claim than the matrix theorem: whether modulewise early-gradient spectra can allocate a limited LoRA budget inside a nonlinear transformer.  The study was frozen before the full run and is conditional on two named synthetic task families.  Each independent unit is one task/base-model seed run; budgets and adaptation replicates are nested observations rather than additional independent samples.
 
-\paragraph{Calibration pipeline.}
-For each candidate site $j$, forward and backward hooks collect module inputs $x_{j,b,a}$ and output-gradient vectors $\tilde g_{j,b,a}$ from PyTorch backpropagation of the mean token loss on calibration batch $b$.  The implementation estimates
+\paragraph{Model, tasks, and calibration.}
+Each run trains a two-layer decoder-only transformer with $d_{\rm model}=64$, four attention heads, MLP width 128, and zero dropout on a base task, freezes it, and adapts to a shifted task.  Modular arithmetic changes an offset under modulus 31 and exposes eight $q$, $v$, $o$, and MLP-output sites.  Associative recall changes a 16-key mapping and exposes ten sites, additionally including $k$ projections.  For site $j$, hooks estimate
 \begin{equation}
-    \widehat C_j=\frac1{N_j}\sum_{b,a} x_{j,b,a}x_{j,b,a}^\top,
-    \qquad
-    \widehat G_j=\frac1{B_j}\sum_b\sum_a \tilde g_{j,b,a}x_{j,b,a}^\top,
+    \widehat C_j=\frac1{N_j}\sum_{b,a}x_{j,b,a}x_{j,b,a}^{\top},\qquad
+    \widehat G_j=\frac1{B_j}\sum_b\sum_a \widetilde g_{j,b,a}x_{j,b,a}^{\top},
 \end{equation}
-where $\tilde g$ already includes the batch mean-loss normalization.  This is the empirical full-gradient estimator used by the released code.  We then form the regularized whitened early-gradient matrix
-\begin{equation}
-    \Mhat_{j,\lambda}=-\widehat G_j(\widehat C_j+\lambda_j I)^{-1/2}.
-\end{equation}
-The runs below use diagonal whitening with $\lambda_j=0.01\,\operatorname{tr}(\widehat C_j)/d_j$, eight calibration batches of size 128, and a permutation null at quantile $0.995$ for thresholded quantities.  From the singular values of $\Mhat_{j,\lambda}$ we compute effective rank, hard detectable rank, soft spectral dimension, gradient norm, and marginal singular-energy scores.
+and form $\widehat M_{j,\lambda}=-\widehat G_j(\widehat C_j+\lambda_j I)^{-1/2}$ with diagonal whitening and $\lambda_j=0.01\operatorname{tr}(\widehat C_j)/d_j$.  Calibration uses eight batches of size 128, 4,096 permutation-null maxima per site, a 0.995 edge quantile, and 2,000 edge-uncertainty resamples.  Rank sweeps use $\{0,1,2,4,8,16\}$.
 
-\paragraph{Tasks and LoRA sweeps.}
-We evaluate two adaptation tasks.  In modular arithmetic, the base task uses modulus 31 with offset 0 and the adaptation task shifts to offset 5; base training uses 600 steps.  Candidate sites are $q$, $v$, $o$ attention projections and MLP $fc2$ in each of two layers.  In associative recall, the model uses 16 keys and four key--value pairs; the adaptation task shifts the key--value map by 3; base training uses 1000 steps.  Candidate sites additionally include $k$ projections.  The runner records base-task and shifted-task accuracy before LoRA in each run's \texttt{base/base\_metrics.csv}; the reported summaries use runs with near-perfect base-task accuracy and near-zero shifted-task accuracy before LoRA, yielding a clean distribution shift.  LoRA sweeps use ranks $\{0,1,2,4,8,16\}$, $\alpha=16$, learning rate $0.01$, clipping at 1.0, and 300--350 adaptation steps.  We run three seeds per task.
-
-\paragraph{Budgeted allocation.}
-We compare a fair \emph{uniform-fill} baseline against early-gradient allocation rules.  Unlike naive uniform rank, uniform-fill spends the available budget by incrementing ranks as evenly as possible, so it is not artificially rank-zero at small budgets.  Spectral and gradient rules allocate ranks under the same parameter budget using effective rank, soft spectral dimension, gradient norm, or marginal singular-energy gains.
+\paragraph{Prespecified comparison and controls.}
+The primary allocation rule is soft spectral dimension under fixed update scale, compared with a deterministic uniform allocation constructed at the same realized trainable-parameter cost for every candidate allocation.  Standard $\alpha/r$ and rsLoRA are separate sensitivity conditions.  Adapter initialization, training batches, evaluation examples, and all declared random streams are shared across paired rules.  Modular arithmetic is evaluated exhaustively.  Each budget has three adaptation replicates; the six modular and seven associative-recall budgets are first averaged within a task--seed run.  Five independent seeds per task are then averaged within task, and the confirmatory omnibus estimate weights the two task means equally.  Inference uses 10,000 within-task run bootstrap resamples and an exact two-sided task-stratified sign-flip test over all $2^{10}$ patterns.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.48\linewidth]{fig_mean_delta_by_task.png}
-\includegraphics[width=0.48\linewidth]{fig_assoc_budget_loss.png}
-\caption{Synthetic-transformer module experiments.  Left: mean validation-loss delta relative to the fair uniform-fill baseline; negative is better.  Across modular arithmetic and associative recall, early-gradient allocation rules usually improve over uniform-fill.  Right: associative recall budget curves on a log-loss scale; early-gradient rules spend small budgets on useful modules earlier than uniform-fill.}
-\label{fig:transformer-budget}
+\includegraphics[width=0.78\linewidth]{transformer_primary_run_deltas.pdf}
+\caption{Confirmatory synthetic-transformer run effects.  Each point is one independent task--seed run after averaging three adaptation replicates and the prespecified budgets.  The outcome is final-validation-loss $\Delta=$ soft dimension minus its exact-cost uniform comparator, so positive values favor uniform allocation.  Dotted segments are task means; the dashed line is zero.}
+\label{fig:transformer-primary}
 \end{figure*}
 
 \begin{table*}[t]
 \centering
 \small
-\caption{Synthetic-transformer allocation results across modular arithmetic and associative recall.  Deltas are relative to fair uniform-fill; negative loss delta is better.  The 39 task-budget evaluations are descriptive because budgets are nested within six run-level clusters: three modular seeds over six budgets and three associative-recall seeds over seven budgets.  Low-budget numbers restrict to budgets $512,1024,1536,2048$ and 24 evaluations.}
-\label{tab:transformer-allocation}
-\begin{tabular}{lrrrrr}
+\caption{Prespecified fixed-update-scale transformer comparison.  Positive loss $\Delta$ means the soft-dimension candidate is worse than exact-cost uniform allocation.  The omnibus interval resamples independent runs within task and weights task means equally; $p$ values are exact two-sided sign-flip tests.  Task-specific rows are secondary and have five-run resolution.}
+\label{tab:transformer-primary}
+\begin{tabular}{lrrrrrr}
 \toprule
-Rule & Mean loss $\Delta$ & Wins / 39 & Low-budget loss $\Delta$ & Low-budget wins / 24 & Mean acc. $\Delta$ \\
+Analysis & Runs & Mean loss $\Delta$ & 95\% CI & Exact $p$ & Runs better & Mean acc. $\Delta$ \\
 \midrule
-\input{tables/generated/transformer_allocation_rows.tex}\\
+\input{tables/generated/transformer_primary_rows.tex}\\
 \bottomrule
 \end{tabular}
-
 \end{table*}
 
-\begin{table}[t]
+\paragraph{Confirmatory result.}
+Figure~\ref{fig:transformer-primary} and Table~\ref{tab:transformer-primary} do not support an allocation advantage.  The equal-task-weighted loss difference is $+0.0146$ (95\% CI $[-0.0078,0.0352]$, exact $p=0.2402$), with 3/10 run wins and 0/2 task-family mean wins.  The mean accuracy difference is $-0.0039$.  Associative recall has mean loss $\Delta=+0.0095$ and modular arithmetic $+0.0198$; both intervals include zero.  The release contains 2,925 exact-cost candidate pairs, no realized-cost mismatch, no paired-seed disagreement, no divergent row, and zero metric spread among identical allocations, so the null result is not explained by the randomization and cost defects that invalidated the earlier analysis.
+
+\begin{table*}[t]
 \centering
 \small
-\caption{Run-clustered synthetic-transformer summary.  Each run cluster first averages loss deltas over that run's budgets; the table then summarizes the six run-level means.  This is the appropriate sanity check for the nested budget curves in Table~\ref{tab:transformer-allocation}.}
-\label{tab:transformer-cluster}
-\begin{tabular}{lrrr}
+\caption{Scaling sensitivity for soft dimension versus exact-cost uniform allocation.  Fixed update scale is confirmatory; standard $\alpha/r$ and rsLoRA are exploratory.  Negative loss $\Delta$ favors the spectral candidate.  None of the exact two-sided tests reaches 0.05.}
+\label{tab:transformer-scaling}
+\begin{tabular}{llrrrrr}
 \toprule
-Rule & Mean $\Delta$ & SEM & Runs better \\
+Scaling & Role & Omnibus loss $\Delta$ & Exact $p$ & Runs better & Assoc. $\Delta$ & Modular $\Delta$ \\
 \midrule
-\input{tables/generated/transformer_cluster_rows.tex}\\
+\input{tables/generated/transformer_scaling_rows.tex}\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\paragraph{Scaling and task heterogeneity.}
+Table~\ref{tab:transformer-scaling} shows that the direction changes with the LoRA scaling rule.  Under standard $\alpha/r$, the exploratory mean is $-0.0340$ with 6/10 run wins and both task means negative, but the exact $p$ value is $0.1973$; rsLoRA is near zero overall.  This is evidence of rank--scale sensitivity, not evidence for selecting the most favorable condition after observing outcomes.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Sitewise association between spectral score and the near-best 0.1-gap useful-rank target under fixed update scale.  Values are mean Spearman correlations over five independent runs, with SEM.}
+\label{tab:transformer-sitewise}
+\begin{tabular}{llrr}
+\toprule
+Task & Predictor & Mean $\rho$ & SEM \\
+\midrule
+\input{tables/generated/transformer_sitewise_rows.tex}\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Results.}
-Figure~\ref{fig:transformer-budget} and Table~\ref{tab:transformer-allocation} show the descriptive task-budget results.  Because budgets within a seed are correlated, Table~\ref{tab:transformer-cluster} also reports run-clustered means.  The best cross-task spectral allocator is the soft-threshold spectral dimension: it improves mean validation loss by $0.1074$ relative to uniform-fill, wins on $33/39$ descriptive task-budget evaluations, and has negative mean loss delta in $5/6$ run clusters.  At low budgets $\{512,1024,1536,2048\}$, soft dimension wins on $19/24$ evaluations and gives mean loss improvement $0.1425$.  Gradient norm is a strong non-spectral baseline, winning $32/39$ descriptive evaluations with mean accuracy improvement $0.0317$.  Effective rank is still useful, especially as a sitewise rank-demand statistic, but is not the best budget allocator in these transformer tasks.  Marginal-gain edge is the least reliable rule in aggregate.
+Table~\ref{tab:transformer-sitewise} further separates module importance from rank demand.  Effective rank and soft dimension correlate positively with useful rank in modular arithmetic but negatively in associative recall.  A module can have a strong early-gradient spectrum yet achieve most of its attainable gain at low rank; a scalar score need not simultaneously encode whether a site matters and how many directions it needs.
 
-The transformer evidence shifts the empirical emphasis.  In matrix simulations, early-gradient effective rank predicts a smallest useful rank.  In transformer modules, the stronger claim is that early-gradient spectral dimensions identify where a limited rank budget should be spent.  These are consistent: a high-spectrum module may be so useful that even low rank recovers most of its own attainable gain, while still deserving budget in a multi-site allocation.
-
-
-\paragraph{Whitening ablation.}
-The theory predicts that the relevant spectrum is activation weighted, not simply the raw weight-gradient spectrum.  We therefore run a whitening ablation on one modular seed and one associative-recall seed, recomputing module scores with no whitening, diagonal whitening, and full regularized whitening.  This ablation reuses trained base models and compares allocation rules under the same budgets as above.  Table~\ref{tab:whitening-ablation} and Figure~\ref{fig:whitening-ablation} summarize the combined result over $13$ task-budget cases.  The best rule is full-whitened soft dimension, with mean validation-loss delta $-0.2203$ versus uniform-fill and wins on $10/13$ cases.  It also improves over the gradient-norm baseline, whose mean delta is $-0.1559$.  Diagonal or full whitening substantially improves effective-rank allocation: raw effective rank has mean delta $-0.0105$, while full effective rank reaches $-0.1766$ and diagonal effective rank wins on all $13/13$ cases.  Soft dimension is more robust: it works well with no, diagonal, and full whitening.  The result is not uniform across tasks; in associative recall, unwhitened soft dimension is strongest, while in modular arithmetic full or diagonal whitening is best.  Thus whitening matters, especially for effective rank, but the best practical rule remains task dependent.
-
-\begin{table*}[t]
-\centering
-\small
-\caption{Whitening ablation on one modular seed and one associative-recall seed.  Deltas are relative to fair uniform-fill; negative is better.  Low-budget numbers restrict to budgets $512,1024,1536,2048$ and eight cases.}
-\label{tab:whitening-ablation}
-\begin{tabular}{llrrrrr}
-\toprule
-Rule & Whitening & Mean loss $\Delta$ & Wins / 13 & Low-budget loss $\Delta$ & Low-budget wins / 8 & Mean acc. $\Delta$ \\
-\midrule
-\input{tables/generated/whitening_rows.tex}\\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.48\linewidth]{fig_whitening_combined_mean_delta.png}
-\includegraphics[width=0.48\linewidth]{fig_whitening_by_task.png}
-\caption{Whitening ablation.  Left: combined mean validation-loss delta relative to uniform-fill; negative is better.  Right: task-specific mean deltas for selected rules.  Whitening improves effective rank strongly on the modular task, while soft dimension remains robust across whitening choices.}
-\label{fig:whitening-ablation}
-\end{figure*}
+\paragraph{Superseded analyses.}
+The former six-cluster, 39-budget ``33/39 wins'' summary and its one-seed-per-task whitening ablation were generated before common-random-number and exact-cost controls.  They are not publication evidence, are not inputs to any current table or figure, and are omitted from the claims.  Whitening remains theoretically motivated, but its transformer allocation effect must be rerun under the corrected protocol.
 
 \FloatBarrier
 
@@ -391,33 +382,33 @@ where $c_j=d_{j,{\rm in}}+d_{j,{\rm out}}$ and $\kappa$ is calibrated to the bud
 \end{equation}
 and includes directions with $\widehat b_{j,i}/c_j>\lambda$.  The population version of this rule follows directly from \cref{thm:population}: each singular direction reduces risk by $\half\sigma_{j,i}^2$ at cost $c_j$.
 
-The empirical takeaway is not that a single rule is universally optimal.  Rather, early-gradient rules form a useful allocation family.  Soft spectral dimension is the strongest spectral budget allocator in our two transformer tasks, effective rank is the most direct theorem-derived soft-rank statistic, and gradient norm is a competitive non-spectral baseline that must be retained.
+The population marginal-gain interpretation is exact in the reduced-rank model, but the released transformer experiment does not validate the simple proportional soft-dimension rule as a universal allocator.  A practical method must distinguish site importance from within-site rank demand, retain exact-cost uniform and gradient-based baselines, prespecify the LoRA scaling rule, and likely normalize or constrain allocations by module family.  We therefore present these equations as a theory-motivated design family rather than as a supported production algorithm.
 
 % -----------------------------------------------------------------------------
 \section{Future Validation Targets}
 \label{sec:next-validation}
 
-The synthetic-transformer bridge is positive but limited.  The whitening ablation supports the activation-weighted viewpoint, while also showing task dependence: whitening helps effective rank strongly in modular arithmetic, whereas associative recall is already well served by unwhitened or softly thresholded spectra.  The next task-level validation should add copy/reverse-copy, in-context regression or classification, and finite-state sequence shifts.  We should also test whether the soft-dimension advantage persists when candidate sites include all attention and MLP projections rather than a hand-picked subset, and replicate the whitening ablation across all seeds.  A later open-model experiment should use a small checkpoint suite; the present real-model result is treated only as a limited fixed-scale check, not as broad empirical validation.
+The next synthetic study should expand the number of task families and separate two predictions: a site's attainable adaptation gain and the rank needed to recover that gain.  Allocation rules should be preregistered with module-family constraints, exact realized-cost matching, fixed stochastic streams, and a single primary scaling convention; whitening must be replicated under these controls rather than inferred from the superseded ablation.  Power should be based on independent task--seed runs, not nested budgets or adaptation replicates.  A later open-model study should apply the same controls to several checkpoints and datasets, include stronger adaptive-rank baselines, and treat the present GPT-2 result only as pilot evidence.
 % -----------------------------------------------------------------------------
 \section{Discussion}
 \label{sec:discussion}
 
-The main result is not that nominal rank works; it is that useful adaptation is governed by spectra of activation-weighted task directions.  Early gradients estimate those spectra in the reduced-rank model.  Effective rank is strongest for matrix useful-rank prediction, while soft-threshold spectral dimension is strongest for budgeted transformer-module allocation in the current experiments.
+The strongest result is the reduced-rank connection between activation-weighted task spectra, early gradients, and useful rank.  The five-seed matrix study supports that connection under both hard-knee and sample-limited regimes.  The transformer study asks a distinct question and supplies a useful falsification: the primary scalar allocation rule does not beat an exact-cost uniform baseline, and its behavior depends on task family and rank scaling.
 
 \paragraph{Limitations.}
-The exact theorem is linear reduced-rank adaptation, not full nonlinear transformer fine-tuning.  Most experiments are synthetic, and the real validation is deliberately small: GPT-2 on Wikitext-2 with a restricted set of LoRA target families and fixed update scale.  Gradient norm is a strong baseline, uniform rank can win when module families with very different per-rank costs are mixed, and the best spectral statistic is task-dependent.  The intruder-direction hypothesis and unsigned merge-overlap hypothesis are not central because the simulations did not support them robustly.
+The theorem is linear reduced-rank adaptation, not nonlinear transformer optimization.  Stage4 is synthetic and uses 48 simulated layers per seed.  The transformer allocation inference is conditional on only two prespecified task families and ten independent runs, so its intervals remain wide.  The exploratory scaling results are not multiplicity-adjusted confirmatory tests.  The real validation uses a small local GPT-2/Wikitext-2 setup, restricted target modules, short training, and fixed update scale; its uniform comparison is descriptive.  Gradient norm and exact-cost uniform allocation remain necessary baselines.
 
 \paragraph{Claim boundary.}
-The safest claim is: in reduced-rank adaptation and spiked synthetic LoRA simulations, early-gradient spectral dimensions, especially effective rank, predict the smallest useful adapter rank.  In small synthetic transformer modules, early-gradient spectral allocation rules beat fair uniform-fill rank allocation under equal budgets, with soft-threshold spectral dimension the strongest overall spectral allocator in our current tasks.  In a small GPT-2/Wikitext-2 validation, spectral-effective allocation transfers in a restricted $c_{attn},c_{fc}$ setting but not when attention-output projections are added without module-family constraints.  We do not claim that one spectral rule uniformly dominates gradient norm or uniform rank across all target-module choices.
+The supported claim is that activation-whitened early-gradient spectra predict useful rank in the reduced-rank model and controlled spiked matrix simulations.  The current evidence does not establish that a scalar spectral dimension should determine cross-module LoRA budgets.  The corrected synthetic-transformer study is consistent with no benefit under fixed update scale and shows scale- and task-dependent directions.  The GPT-2 result motivates further testing but does not override that confirmatory null result.
 
 % -----------------------------------------------------------------------------
 \section{Conclusion}
 \label{sec:conclusion}
 
-Useful low-rank adaptation is a spectral problem.  In the population reduced-rank model, useful rank is exactly the spectral energy rank of $\DeltaStar C^{1/2}$, and the activation-whitened early gradient reveals this spectrum before adapter training.  Multi-seed matrix simulations support useful-rank prediction.  Synthetic transformer experiments show that early-gradient spectral dimensions can allocate LoRA rank better than fair uniform-fill baselines, and a small GPT-2/Wikitext-2 validation provides a limited pretrained-transformer check.  The attention-projection ablation also sets a clear boundary: practical allocators should respect module-family structure rather than spend rank purely by scalar spectral score per parameter.
+Useful low-rank adaptation is governed by activation-weighted task spectra in the reduced-rank population model, and early gradients reveal those spectra before adapter training.  Multi-seed matrix simulations support prediction of practical useful-rank targets.  The publication-grade synthetic-transformer experiment narrows the practical conclusion: soft spectral dimension does not outperform exact-cost uniform allocation under the prespecified fixed-scale condition, and the direction varies with scaling and task.  Early-gradient spectra remain a principled diagnostic, but converting them into a reliable cross-module allocator requires additional modeling and broader validation.
 
 \section*{Reproducibility Statement}
-All experiments write CSV metrics, configuration files, and figures.  The matrix and small-transformer experiments use synthetic data; the real validation uses a local GPT-2 checkpoint and local Wikitext-2 parquet-to-text files.  The clean release has two source directories, \texttt{Code/} and \texttt{Paper/}, plus the compiled top-level manuscript \texttt{paper.pdf}.  Inside \texttt{Code/}, \texttt{transformer/} contains the synthetic-transformer module experiments, \texttt{rmt\_lora\_sim/} contains the BBP, LoRA rank/scale, signed-conflict, and Stage4 matrix simulations, and \texttt{real\_lora\_validation/} contains the GPT-2/Wikitext-2 validation.  Released matrix CSV outputs are stored under semantic names in \texttt{rmt\_lora\_sim/results/released/}; new runs write to package-local \texttt{runs/} directories.  Paper-facing Stage4 rows, real-LoRA rows, figures, and generated table rows are regenerated from released CSVs by \texttt{Paper/import\_stage4\_aggregate.py}, \texttt{Paper/import\_real\_lora\_results.py}, and \texttt{Paper/make\_paper\_artifacts.py}.  The released real-model tables use normalized squared singular values, $p_i=\sigma_i^2/\sum_j\sigma_j^2$, for entropy effective rank; the superseded raw-singular-value tables are retained in an explicitly labeled archive, and the corrected per-seed evidence includes input manifests, environment records, and SHA-256 checksums.
+All experiments write machine-readable metrics, frozen configurations, and provenance records.  The corrected Stage4 table is imported from a five-seed release by \path{Paper/import_stage4_aggregate.py}.  Corrected transformer tables are imported by \path{Paper/import_transformer_publication.py}, which verifies the release and archive checksums, rejects smoke or stale-plan releases, reconstructs ten primary run effects from raw exact-cost rows, checks paired stochastic streams and realized costs, and recomputes the confirmatory interval and exact test.  The manuscript uses release \path{transformer_publication_20260622T101458Z}.  Its full archive and frozen-plan SHA-256 values are recorded in \path{Paper/tables/transformer_publication/source.json}.  \path{Paper/make_paper_artifacts.py} accepts only the imported post-CRN transformer tables for current figures and rows.  Legacy pre-CRN transformer files remain solely for audit history and are excluded from manuscript generation.  The real-model importer and corrected per-seed evidence retain input manifests, environment records, and SHA-256 checksums.
 
 \appendix
 
@@ -449,44 +440,42 @@ In whitened coordinates write $M=sBA$, $s=\alpha/r$, and $F(M)=\half\|M-\Mstar\|
 \begin{equation}
     M_1=\eta s^2\Mstar A_0^\top A_0.
 \end{equation}
-Thus the first LoRA step is a randomized spectral sketch of the task operator.  In aligned singular coordinates, the idealized gradient-flow mode amplitude satisfies
+Thus the first LoRA step is a randomized spectral sketch of the task operator.  Under factor gradient flow,
+\begin{align}
+    \dot B&=-s(M-\Mstar)A^\top, &
+    \dot A&=-sB^\top(M-\Mstar),\\
+    \dot M&=-s^2\!\left[(M-\Mstar)A^\top A\right.\\
+          &\qquad\left.{}+BB^\top(M-\Mstar)\right].
+\end{align}
+For one aligned mode with scalar factors $a_i,b_i$, $m_i=sa_ib_i$, and target singular value $\sigma_i$,
 \begin{equation}
-    \dot m_i(t)=2s\,m_i(t)(\sigma_i-m_i(t)),
+    \dot m_i=s^2(a_i^2+b_i^2)(\sigma_i-m_i).
 \end{equation}
-so larger singular modes are learned faster.
+Only on the balanced positive branch $a_i^2=b_i^2=m_i/s$ does this reduce to $\dot m_i=2s m_i(\sigma_i-m_i)$.  Zero-$B$ initialization is initially unbalanced: $m_i(0)=0$ but $\dot m_i(0)=s^2a_i(0)^2\sigma_i$, consistent with the one-step formula above.  The previously stated logistic equation is therefore a balanced special case, not the zero-$B$ initialization dynamics.
 
 % -----------------------------------------------------------------------------
 \section{Reproducibility Details}
 \label{app:reproducibility}
 
-The project generated archives for BBP, LoRA rank, alpha, merge, stage1b, stage2, stage3, stage4, and synthetic-transformer experiments.  Each run writes CSV metrics and figure files.  The transformer runs used a two-layer decoder-only transformer with $d_{\rm model}=64$, four heads, MLP width 128, diagonal whitening with $\lambda=0.01\,\operatorname{tr}(\widehat C)/d$, ranks $\{0,1,2,4,8,16\}$, and LoRA $\alpha=16$.  Stage4 fits use
+The project generated archives for BBP, LoRA rank, alpha, merge, stage1b, stage2, stage3, Stage4, and transformer experiments.  Each run writes CSV metrics and provenance files.  The transformer publication design uses a two-layer decoder-only model with $d_{\rm model}=64$, four heads, MLP width 128, diagonal whitening with $\lambda=0.01\,\operatorname{tr}(\widehat C)/d$, ranks $\{0,1,2,4,8,16\}$, LoRA $\alpha=16$, fixed-update-scale primary analysis, standard and rsLoRA sensitivities, five base seeds per task, and three adaptation replicates per budget.  Stage4 fits use
 \begin{equation}
     \log_2 r_j^{\rm target}=a+b\log_2(1+s_j)+\epsilon_j,
 \end{equation}
 where $s_j$ is a spectral score.  Main targets are $r_{\near}(0.1)$, $r_{\near}(0.2)$, $r_{\rec}(0.7)$, $r_{\rec}(0.8)$, $r_{\pen}(0.2)$, and $r_{\pen}(0.3)$.
 
 \paragraph{Release commands.}
-From \texttt{Code/}, \texttt{make test} runs the lightweight code tests, \texttt{make smoke-transformer} runs the synthetic-transformer smoke path, and \texttt{make smoke-rmt} runs the general RMT/LoRA smoke path.  Stage4 has a dedicated end-to-end check, \texttt{cd rmt\_lora\_sim \&\& bash scripts/run\_stage4\_smoke.sh}.  The paper-grade Stage4 command is \texttt{bash scripts/run\_stage4.sh}; it writes all per-rank source rows, an aggregate manifest, and nested SHA-256 manifests to a self-contained release under \texttt{runs/stage4\_releases/}.  After validating that five-seed release, \texttt{make stage4-to-paper} imports it.  The superseded bundled Stage4 aggregate is intentionally rejected.  \texttt{make real-lora-to-paper} imports the released GPT-2/Wikitext summaries, and \texttt{make paper} regenerates tables and figures, compiles the manuscript in \texttt{Paper/}, and copies the PDF to top-level \texttt{paper.pdf}.
+From \path{Code/}, \texttt{make test} runs the lightweight code tests.  Stage4 smoke and publication releases use \path{run_stage4_smoke.sh} and \path{run_stage4.sh}; \texttt{make stage4-to-paper} imports only a validated five-seed release.  Transformer smoke and publication releases use \path{run_transformer_publication_smoke.sh} and \path{run_transformer_publication.sh}.  After validation, \texttt{make transformer-to-paper} independently imports the corrected ten-run aggregate.  \texttt{make real-lora-to-paper} imports the GPT-2/Wikitext summaries, and \texttt{make paper} runs all three importers, regenerates current artifacts, compiles in \path{Paper/}, and copies the result to top-level \path{paper.pdf}.
 
-\begin{table*}[t]
-\centering
-\small
-\caption{Task-specific transformer allocation summary.  Deltas are relative to uniform-fill.  This table separates task scales instead of averaging only raw losses across modular arithmetic and associative recall.}
-\label{tab:transformer-by-task}
-\begin{tabular}{llrrrr}
-\toprule
-Task & Rule & Mean loss $\Delta$ & Wins & Mean acc. $\Delta$ & Mean loss ratio \\
-\midrule
-\input{tables/generated/by_task_transformer_rows.tex}\\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-Table~\ref{tab:transformer-by-task} is the task-specific complement to the pooled transformer table.  It shows that pooled raw deltas should be read descriptively: modular arithmetic and associative recall have different loss scales, and associative recall contains near-zero uniform-fill losses at some budgets that can inflate ratios even when raw deltas are small.
+\paragraph{Transformer inference resolution.}
+The ten-run omnibus exact test enumerates 1,024 sign patterns under the task-stratified statistic and has nominal minimum nonzero two-sided resolution $2/1024=0.001953125$.  Each five-run task-specific test is secondary and has minimum two-sided resolution $2/32=0.0625$.  Budgets and adaptation replicates are averaged within their task--seed run and never counted as independent units.
 
 \FloatBarrier
 
 % -----------------------------------------------------------------------------
+\begingroup
+\footnotesize
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
 \begin{thebibliography}{99}
 \bibitem{hu2021lora} Edward J. Hu et al. LoRA: Low-Rank Adaptation of Large Language Models. \emph{arXiv:2106.09685}, 2021.
 \bibitem{dettmers2023qlora} Tim Dettmers et al. QLoRA: Efficient Finetuning of Quantized LLMs. \emph{arXiv:2305.14314}, 2023.
@@ -502,5 +491,6 @@ Table~\ref{tab:transformer-by-task} is the task-specific complement to the poole
 \bibitem{merity2016pointer} Stephen Merity, Caiming Xiong, James Bradbury, and Richard Socher. Pointer Sentinel Mixture Models. \emph{arXiv:1609.07843}, 2016.
 \bibitem{benaych2012singular} Florent Benaych-Georges and Raj Rao Nadakuditi. Singular values and vectors of low rank perturbations of large rectangular random matrices. \emph{J. Multivariate Analysis}, 2012.
 \end{thebibliography}
+\endgroup
 
 \end{document}

@@ -1,0 +1,54 @@
+{
+  "analysis_plan_sha256": "89c74a8d3e773cd20950bf2a9854bcdf39cd6f0a38a8eed78ca0d3345c85be6d",
+  "analysis_plan_version": "transformer_publication_plan_v1",
+  "importer": "import_transformer_publication.py",
+  "max_identical_metric_spread": 0.0,
+  "max_identical_seed_disagreement": 0,
+  "n_diverged_rows": 0,
+  "n_exact_candidate_pairs": 2925,
+  "n_identical_allocation_groups": 819,
+  "n_recursive_checksums": 350,
+  "n_source_runs": 10,
+  "outputs": {
+    "primary_analysis.csv": {
+      "relative_path": "tables/transformer_publication/primary_analysis.csv",
+      "rows": 1,
+      "sha256": "b18066194e1bb365c548f33a0c3487af3ff43137ed734b05399a07ad5427e1c2"
+    },
+    "primary_analysis_by_task.csv": {
+      "relative_path": "tables/transformer_publication/primary_analysis_by_task.csv",
+      "rows": 2,
+      "sha256": "5721f751f79a102b8b7ac5f4ae32bac7b7a739d58c91694c66e0d893e47a8264"
+    },
+    "primary_run_deltas.csv": {
+      "relative_path": "tables/transformer_publication/primary_run_deltas.csv",
+      "rows": 10,
+      "sha256": "416b6f93770c6bbcb5f61a0e5f80a5edeafa2d0054fd4c9ecec58df779313549"
+    },
+    "scaling_sensitivity.csv": {
+      "relative_path": "tables/transformer_publication/scaling_sensitivity.csv",
+      "rows": 3,
+      "sha256": "9a3bbbef3413d7f4178e08460d5f16c1f3157691456e2907f7749df1e7f3b287"
+    },
+    "site_prediction_selected.csv": {
+      "relative_path": "tables/transformer_publication/site_prediction_selected.csv",
+      "rows": 4,
+      "sha256": "23f3382250d30f760a6f39dae40c5e52b4353fe79a58ca06850bf6af2081c245"
+    }
+  },
+  "primary_cluster_bootstrap_ci": [
+    -0.007750680089594088,
+    0.03521469451846864
+  ],
+  "primary_exact_sign_flip_p_two_sided": 0.240234375,
+  "primary_mean_loss_delta": 0.014638354179882738,
+  "primary_run_wins": 3,
+  "primary_task_wins": 0,
+  "protocol_version": "synthetic_transformer_publication_protocol_v4",
+  "source_aggregate_manifest_sha256": "0408e4d6e86df950fed2e414fb95b4b7f48df53fd047dc2ef090a52b9509291a",
+  "source_archive_sha256": "b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3",
+  "source_primary_analysis_sha256": "3cfea79c0a7742eba4183122184d1578aecfc1adaee71edc317c174086051b22",
+  "source_release_checksum_manifest_sha256": "9370616eb1b49eeeccbb811ee4bdd7cfcc0de12fc90aa2ef9e725943dbc64792",
+  "source_release_id": "transformer_publication_20260622T101458Z",
+  "source_release_manifest_sha256": "8f112dcf75240c19035fea08c26c35399eba1addd6c2a375731ccf40acb839a3"
+}

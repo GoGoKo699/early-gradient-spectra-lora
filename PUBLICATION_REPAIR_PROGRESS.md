@@ -130,3 +130,50 @@ Implemented:
 All 33 transformer tests and both plan-only validation gates pass locally. The
 two-task smoke release must now be generated on the owner machine and verified
 before launching the ten source-run publication experiment.
+
+## Step 5 owner smoke verification
+
+Status: **completed.**
+
+The two-task smoke release passed recursive checksums, all four source-run
+validators, both frozen-plan hashes, exact-cost pairing, common-random-number
+invariants, and the publication release validator. Its numerical output was
+correctly treated as non-evidential.
+
+## Step 6 full transformer publication release
+
+Status: **completed and independently verified.**
+
+The full release contains two task families and five independent base-model
+seeds per task, with three adaptation replicates per budget. All 350 recursive
+checksums, ten source runs, 2,925 exact-cost candidate pairs, identical-
+allocation invariants, and 38 bundled tests pass. The prespecified fixed-scale
+soft-dimension comparison has mean loss delta `+0.014638`, 95% task-stratified
+bootstrap interval `[-0.007751, +0.035215]`, exact two-sided sign-flip
+`p=0.240234`, 3/10 run wins, and 0/2 task-family wins. This does not support the
+former positive transformer-allocation claim.
+
+## Step 7 manuscript synchronization and theory correction
+
+Status: **implemented and validation-gated.**
+
+Implemented:
+
+- a transformer manuscript importer that verifies the archive and recursive
+  manifests, rejects stale/smoke releases, reconstructs primary run effects
+  from raw exact-cost rows, checks common-random-number invariants, and
+  recomputes inference;
+- paper-facing primary, task-specific, scaling-sensitivity, site-prediction,
+  and run-level provenance tables;
+- replacement of the invalid 33/39-win and whitening narratives with the
+  prespecified ten-run null result and explicit scale/task heterogeneity;
+- exclusion of all pre-CRN transformer files from current artifact generation;
+- correction of the factorized gradient-flow equation, including the distinction
+  between general zero-B dynamics and the balanced logistic special case; and
+- `transformer-to-paper` build targets in both Makefiles.
+
+## Remaining submission work after Step 7
+
+1. Complete or sharply narrow the real-model stochastic-control evidence.
+2. Update adaptive-rank baselines and related work.
+3. Perform final rendered-PDF, metadata, archive, and root-checksum preflight.
