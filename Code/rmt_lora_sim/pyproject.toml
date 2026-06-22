@@ -12,6 +12,7 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
+    "scipy>=1.13",
     "matplotlib>=3.7",
     "pyyaml>=6.0",
     "threadpoolctl>=3.1",
