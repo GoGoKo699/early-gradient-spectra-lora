@@ -14,6 +14,8 @@ import sys
 import matplotlib
 import numpy as np
 import pandas as pd
+import scipy
+import threadpoolctl
 import yaml
 
 
@@ -67,7 +69,9 @@ def runtime_versions() -> dict[str, str]:
         "platform": platform.platform(),
         "numpy": np.__version__,
         "pandas": pd.__version__,
+        "scipy": scipy.__version__,
         "matplotlib": matplotlib.__version__,
+        "threadpoolctl": threadpoolctl.__version__,
         "pyyaml": yaml.__version__,
     }
 

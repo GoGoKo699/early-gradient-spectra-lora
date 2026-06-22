@@ -184,3 +184,19 @@ def test_stage4_analysis_plan_declares_one_primary_pair() -> None:
     assert analysis_role("sample_limited", PRIMARY_TARGET, PRIMARY_PREDICTOR) == (
         "confirmatory_robustness"
     )
+
+
+def test_runtime_versions_record_statistical_dependencies() -> None:
+    from rmt_lora.provenance import runtime_versions
+
+    versions = runtime_versions()
+    for package in (
+        "numpy",
+        "pandas",
+        "scipy",
+        "matplotlib",
+        "pyyaml",
+        "threadpoolctl",
+    ):
+        assert package in versions
+        assert versions[package]
