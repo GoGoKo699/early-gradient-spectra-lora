@@ -127,8 +127,11 @@ an omnibus `primary_analysis.csv`, the underlying `primary_run_deltas.csv`, and
 secondary `primary_analysis_by_task.csv` from exact-cost run-cluster summaries.
 The omnibus estimator first averages budgets within a task/seed run, then runs
 within each task, and finally gives each task family equal weight. Its interval
-resamples runs within task; its exact test flips run signs while retaining task
-strata. The full design enumerates all 1,024 sign patterns over ten independent
+resamples runs within task using a versioned, outcome-independent deterministic
+seed derived from the analysis identity and stratum sizes; values are sorted
+within task so validation is invariant to row order and harmless CSV
+round-tripping. Its exact test flips run signs while retaining task strata. The
+full design enumerates all 1,024 sign patterns over ten independent
 runs at a pre-specified two-sided alpha of 0.05 (nominal minimum two-sided
 p-value 0.001953125). Task-specific five-run results are secondary and retain
 their coarser exact-test resolution. Inference is conditional on the two named
@@ -136,7 +139,9 @@ task families. The release and aggregate carry explicit schema versions, and
 the release validator reconstructs the confirmatory run rows directly from
 each source run's raw exact-cost budget table before recomputing all primary
 statistics. Existing validated source runs may be reused only with `--resume`;
-invalid or partial runs are rejected.
+invalid or partial source runs are rejected. An incomplete release directory
+without its archive/sidecar is removed and rebuilt from the validated source
+runs and regenerated aggregate.
 Subprocesses use Matplotlib's noninteractive `Agg` backend and an ignored local
 font/config cache, so headless publication runs do not depend on desktop display
 state or pollute Git provenance with cache files.

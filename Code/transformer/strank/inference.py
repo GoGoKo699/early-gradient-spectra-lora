@@ -10,6 +10,11 @@ from typing import Iterable, Sequence
 import numpy as np
 
 
+TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME = (
+    "analysis_identity_and_stratum_size_v1"
+)
+
+
 def _stable_int_seed(*parts: object) -> int:
     payload = json.dumps(
         parts, sort_keys=True, separators=(",", ":"), default=str
@@ -61,19 +66,27 @@ def task_stratified_bootstrap_interval(
         raise ValueError("confidence must lie strictly between zero and one")
     if int(n_resamples) <= 0:
         raise ValueError("n_resamples must be positive")
+    # The Monte Carlo design must not depend on the exact binary spelling of
+    # observed floating-point outcomes. Aggregate generation and independent
+    # release validation may reach numerically equivalent values through
+    # different CSV/groupby paths; hashing those values would select unrelated
+    # bootstrap draws. Sort within strata for permutation invariance and seed
+    # only from the declared analysis identity and stratum sizes.
+    task_values_by_stratum = [
+        (task, np.sort(data[labels == task])) for task in tasks
+    ]
     rng = np.random.default_rng(
         _stable_int_seed(
             "task_stratified_bootstrap",
-            data.tolist(),
-            labels.tolist(),
+            TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME,
+            [(task, len(task_values)) for task, task_values in task_values_by_stratum],
             float(confidence),
             int(n_resamples),
             *seed_parts,
         )
     )
     estimates = np.zeros(int(n_resamples), dtype=float)
-    for task in tasks:
-        task_values = data[labels == task]
+    for _task, task_values in task_values_by_stratum:
         indices = rng.integers(
             0, len(task_values), size=(int(n_resamples), len(task_values))
         )

@@ -144,8 +144,13 @@ The aggregate must include `analysis_plan.yaml`, omnibus
 run-cluster deltas, and run-cluster summaries. The confirmatory estimator first
 averages budgets within each task/seed run, averages independent runs within
 each task family, and then weights the two task-family means equally. Its
-bootstrap resamples runs separately within each task; its exact sign-flip test
-uses the same task-stratified statistic. This resolves the discrete-test issue
+bootstrap resamples runs separately within each task. Bootstrap indices use a
+versioned deterministic seed based only on the declared analysis identity and
+stratum sizes, never on raw floating-point outcomes, and values are sorted
+within task before resampling. This makes aggregate construction and independent
+validation invariant to row order and numerically harmless serialization. Its
+exact sign-flip test uses the same task-stratified statistic. This resolves the
+discrete-test issue
 that would make a separate two-sided five-run test incapable of producing
 `p < 0.05`. The inference is explicitly conditional on the two pre-specified
 task families, not a claim over an unspecified population of transformer tasks.

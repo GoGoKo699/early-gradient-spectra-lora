@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -345,6 +346,36 @@ def _verify_archive_sidecar(archive: Path) -> None:
     print(f"{archive.name}: OK", flush=True)
 
 
+def _prepare_release_outputs_for_resume(
+    final_release_dir: Path, archive: Path, *, resume: bool
+) -> bool:
+    """Return True for a complete release; remove only incomplete resume outputs."""
+
+    sidecar = Path(str(archive) + ".sha256")
+    paths = (final_release_dir, archive, sidecar)
+    if not any(path.exists() for path in paths):
+        return False
+    if not resume:
+        raise ValueError(f"release already exists: {final_release_dir.name}")
+    if final_release_dir.is_dir() and archive.is_file() and sidecar.is_file():
+        return True
+
+    if final_release_dir.exists():
+        if not final_release_dir.is_dir():
+            raise ValueError(f"release path is not a directory: {final_release_dir}")
+        shutil.rmtree(final_release_dir)
+    for path in (archive, sidecar):
+        if path.exists():
+            if not path.is_file():
+                raise ValueError(f"release artifact path is not a file: {path}")
+            path.unlink()
+    print(
+        f"resume: removed incomplete release outputs for {final_release_dir.name}",
+        flush=True,
+    )
+    return False
+
+
 def run_plan(
     plan_path: Path,
     *,
@@ -453,9 +484,9 @@ def run_plan(
 
     final_release_dir = release_root / release_id
     archive = release_root / f"{release_id}.tar.gz"
-    if final_release_dir.exists() or archive.exists():
-        if not resume:
-            raise ValueError(f"release already exists: {release_id}")
+    if _prepare_release_outputs_for_resume(
+        final_release_dir, archive, resume=resume
+    ):
         _run_logged(
             [
                 sys.executable,

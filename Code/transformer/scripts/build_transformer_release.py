@@ -362,7 +362,13 @@ def build_release(
         shutil.rmtree(temporary_dir, ignore_errors=True)
         raise
 
-    validate_release(final_dir, expected_kind=release_kind)
+    try:
+        validate_release(final_dir, expected_kind=release_kind)
+    except Exception:
+        # A failed validator must not leave a directory that looks like a
+        # complete release. Source runs and aggregates remain untouched.
+        shutil.rmtree(final_dir, ignore_errors=True)
+        raise
     archive_path = release_root / f"{release_id}.tar.gz"
     if archive_path.exists():
         raise ValueError(f"archive already exists: {archive_path}")

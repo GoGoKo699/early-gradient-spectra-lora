@@ -8,7 +8,7 @@ from .scaling import scaling_protocol
 
 SYNTHETIC_TRANSFORMER_PROTOCOL_VERSION = "synthetic_transformer_publication_protocol_v4"
 TRANSFORMER_RELEASE_SCHEMA_VERSION = "transformer_release_schema_v1"
-TRANSFORMER_AGGREGATE_SCHEMA_VERSION = "transformer_aggregate_schema_v1"
+TRANSFORMER_AGGREGATE_SCHEMA_VERSION = "transformer_aggregate_schema_v2"
 WHITENING_ABLATION_PROTOCOL_VERSION = "synthetic_transformer_whitening_publication_protocol_v4"
 
 SUPPORTED_ALLOCATION_RULES = {

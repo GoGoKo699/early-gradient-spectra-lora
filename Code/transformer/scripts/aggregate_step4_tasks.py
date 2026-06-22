@@ -29,6 +29,7 @@ from scripts.aggregate_step3_replicates import (
 )
 from scripts.validate_rank_scaling_run import validate as validate_source_run
 from strank.inference import (
+    TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME,
     task_stratified_bootstrap_interval,
     task_stratified_mean,
     task_stratified_sign_flip_p,
@@ -451,6 +452,9 @@ def main() -> None:
                 "two_sided_alpha": alpha,
                 "confidence": confidence,
                 "cluster_bootstrap_resamples": bootstrap_resamples,
+                "cluster_bootstrap_seed_scheme": (
+                    TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME
+                ),
                 "exact_sign_flip_n_units": len(primary_run),
                 "exact_sign_flip_n_patterns": 2 ** len(primary_run),
                 "nominal_min_two_sided_p": 2.0 / (2 ** len(primary_run)),
@@ -517,6 +521,9 @@ def main() -> None:
             "two_sided_alpha": analysis.get("two_sided_alpha"),
             "cluster_bootstrap_resamples": analysis.get(
                 "cluster_bootstrap_resamples"
+            ),
+            "cluster_bootstrap_seed_scheme": (
+                TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME
             ),
             "exact_sign_flip_test": analysis.get("exact_sign_flip_test"),
             "primary_scope": analysis.get("primary_scope"),

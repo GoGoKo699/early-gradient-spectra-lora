@@ -8,6 +8,7 @@ import yaml
 from scripts.build_transformer_release import _copy_code_snapshot
 from scripts.run_transformer_publication import (
     _generated_config,
+    _prepare_release_outputs_for_resume,
     validate_publication_plan,
 )
 from scripts.validate_transformer_release import _validate_analysis_plan_roles
@@ -209,3 +210,40 @@ def test_primary_run_delta_rejects_unequal_exact_cost_pair(
                 }
             },
         )
+
+
+def test_resume_removes_only_incomplete_release_outputs(tmp_path: Path) -> None:
+    final_dir = tmp_path / "release"
+    archive = tmp_path / "release.tar.gz"
+    sidecar = Path(str(archive) + ".sha256")
+    final_dir.mkdir()
+    (final_dir / "partial.txt").write_text("partial", encoding="utf-8")
+    sidecar.write_text("stale", encoding="utf-8")
+
+    assert not _prepare_release_outputs_for_resume(
+        final_dir, archive, resume=True
+    )
+    assert not final_dir.exists()
+    assert not sidecar.exists()
+
+
+def test_resume_preserves_complete_release_outputs(tmp_path: Path) -> None:
+    final_dir = tmp_path / "release"
+    archive = tmp_path / "release.tar.gz"
+    sidecar = Path(str(archive) + ".sha256")
+    final_dir.mkdir()
+    archive.write_bytes(b"archive")
+    sidecar.write_text("digest  release.tar.gz\n", encoding="utf-8")
+
+    assert _prepare_release_outputs_for_resume(final_dir, archive, resume=True)
+    assert final_dir.is_dir()
+    assert archive.is_file()
+    assert sidecar.is_file()
+
+
+def test_nonresume_rejects_existing_release_output(tmp_path: Path) -> None:
+    final_dir = tmp_path / "release"
+    archive = tmp_path / "release.tar.gz"
+    final_dir.mkdir()
+    with pytest.raises(ValueError, match="release already exists"):
+        _prepare_release_outputs_for_resume(final_dir, archive, resume=False)

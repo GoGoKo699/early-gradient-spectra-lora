@@ -24,6 +24,7 @@ from scripts.aggregate_step3_replicates import (
 )
 from scripts.validate_rank_scaling_run import validate as validate_source_run
 from strank.inference import (
+    TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME,
     task_stratified_bootstrap_interval,
     task_stratified_mean,
     task_stratified_sign_flip_p,
@@ -541,6 +542,11 @@ def _validate_aggregate_source_binding(
         raise ValueError("analysis plan confidence must be 0.95")
     if int(analysis.get("cluster_bootstrap_resamples", 0)) != 10_000:
         raise ValueError("analysis plan cluster bootstrap must use 10000 resamples")
+    if (
+        aggregate_manifest.get("cluster_bootstrap_seed_scheme")
+        != TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME
+    ):
+        raise ValueError("aggregate bootstrap seed scheme is missing or stale")
     expected_plan_version = str(plan.get("plan_version", ""))
     for run_id, release_entry in release_by_id.items():
         source_dir = release_dir / _safe_relative_path(
@@ -741,6 +747,7 @@ def _validate_aggregate_source_binding(
         "two_sided_alpha",
         "confidence",
         "cluster_bootstrap_resamples",
+        "cluster_bootstrap_seed_scheme",
         "exact_sign_flip_n_units",
         "exact_sign_flip_n_patterns",
         "nominal_min_two_sided_p",
@@ -835,6 +842,9 @@ def _validate_aggregate_source_binding(
         "allocation_rule": manifest["primary_allocation_rule"],
         "reference_rule": manifest["primary_reference_rule"],
         "metric": manifest["primary_metric"],
+        "cluster_bootstrap_seed_scheme": (
+            TASK_STRATIFIED_BOOTSTRAP_SEED_SCHEME
+        ),
     }
     for key, expected in expected_text.items():
         if str(row[key]) != str(expected):
