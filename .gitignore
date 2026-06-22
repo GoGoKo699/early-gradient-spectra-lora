@@ -17,3 +17,8 @@ __pycache__/
 *.synctex.gz
 # In-tree manuscript build copy; the release artifact is /paper.pdf
 /Paper/paper.pdf
+
+# Real-model local source runs and packaged smoke/publication releases
+/Code/real_lora_validation/real_lora_runs/
+/Code/real_lora_validation/runs/
+/Code/real_lora_validation/requirements-local-freeze.txt

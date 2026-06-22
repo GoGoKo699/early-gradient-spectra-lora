@@ -1,157 +1,168 @@
-# Real pretrained-transformer LoRA validation
+# Controlled real-model LoRA validation
 
-This directory contains the corrected real-model test for the
-gradient-spectrum rank-allocation idea. The publication rerun completed on June
-19, 2026; released summaries and compact per-seed evidence are included.
-It compares approximately budget-matched LoRA strategies on a real pretrained causal LM:
+This directory contains the real-pretrained-model protocol used to test whether
+early gradient spectra support nonuniform LoRA rank allocation. The current
+protocol supersedes the historical real-model runs bundled with earlier project
+snapshots.
 
-1. uniform LoRA rank,
-2. early gradient-norm allocation,
-3. activation-whitened early-gradient spectral-effective-rank allocation.
+## What the corrected protocol controls
 
-It is self-contained and does not require PEFT. It wraps `torch.nn.Linear` and
-HuggingFace GPT-style `Conv1D` modules directly, so every module rank is explicit
-in `allocations.csv`.
+`run_real_lora_validation.py` now enforces:
 
-## Expected environment
+- calibration in `model.eval()` mode while retaining gradients, so dropout does
+  not contaminate spectral estimates;
+- named SHA-256-derived random streams for model loading, adapter initialization,
+  calibration data, training data, evaluation data, training dropout, and
+  evaluation;
+- a canonical maximum-rank LoRA-A initialization per module, with every smaller
+  rank receiving an exact prefix of the same tensor;
+- a training RNG reset after model, adapter, and optimizer construction, so
+  allocation-dependent tensor shapes cannot shift dropout masks;
+- exact trainable-parameter equality to the uniform-rank reference through a
+  bounded dynamic-programming allocator;
+- fixed validation data and fresh, identically seeded training loaders for every
+  strategy;
+- an optional duplicate-uniform identity control; and
+- automatic failure if identical allocations produce different training traces
+  or evaluation metrics beyond the declared tolerance.
 
-For the validated AMD reproduction environment, use the ROCm venv:
+A completed run includes raw calibration batches, activation components,
+allocation and initialization hashes, per-step training histories, named seeds,
+input provenance, protocol checks, and a complete recursive SHA-256 manifest.
+
+## Allocation strategies
+
+The runner supports:
+
+1. `uniform`: exact-cost uniform rank;
+2. `gradient_norm`: early full-weight gradient Frobenius norm;
+3. `spectral_effective`: activation-whitened gradient effective rank;
+4. `eva_activation`: activation explained-variance components;
+5. `fim_gradient_variance`: mean squared initial LoRA-B gradient; and
+6. `gora_sensitivity`: mean absolute full-weight `W * gradient` sensitivity.
+
+The last three are **allocation-only controls**. They use the same nested random
+LoRA initialization as every other strategy. They do not claim to reproduce the
+full initialization or optimization procedures of EVA (arXiv:2410.07170),
+FIM-LoRA (arXiv:2605.16800), or GoRA (arXiv:2502.12171).
+
+## Environment
+
+For the validated AMD setup:
 
 ```bash
 source "$HOME/venvs/lora-rocm721/bin/activate"
 python - <<'PY'
 import torch
-print(torch.__version__, torch.version.hip, torch.cuda.is_available(), torch.cuda.get_device_name(0))
+print(torch.__version__)
+print(torch.version.hip)
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0))
 PY
 ```
 
-Expected: ROCm PyTorch, `cuda available: True`, AMD Radeon Graphics.
+The tested core environment is recorded in
+`requirements-tested-rocm721.txt`. Before a long run, also capture the resolved
+local environment:
 
-## Install into the project
-
-Unpack/copy this directory to:
-
-```text
-Code/real_lora_validation
+```bash
+python -m pip freeze > requirements-local-freeze.txt
 ```
 
-## Step 1: smoke test
+## Unit tests
 
 ```bash
 cd Code/real_lora_validation
-./scripts/run_smoke.sh 2>&1 | tee smoke_$(date +%Y%m%d_%H%M%S).log
+python -m pytest -q
 ```
 
-This uses `sshleifer/tiny-gpt2` plus a built-in text corpus. It only verifies
-that downloads, GPU execution, calibration, allocation, and training run end to end.
-Do not use smoke-test numbers in the paper.
-
-## Step 2: calibration-only GPT-2 test
+## Publication-protocol smoke release
 
 ```bash
 cd Code/real_lora_validation
-./scripts/run_gpt2_calibrate.sh 2>&1 | tee gpt2_calibrate_$(date +%Y%m%d_%H%M%S).log
+bash scripts/run_protocol_smoke.sh 2>&1 | tee real_protocol_smoke.log
 ```
 
-This downloads GPT-2 and Wikitext-2, finds GPT-2 target modules, computes raw and
-activation-whitened early-gradient spectral metrics, writes:
+The smoke uses `sshleifer/tiny-gpt2`, a built-in non-evidential corpus, all six
+allocation strategies, a duplicate uniform control, deterministic algorithms,
+and exact cost matching. It validates and packages the result under:
 
 ```text
-real_lora_runs/<timestamp>_gpt2/calibration_metrics.csv
-real_lora_runs/<timestamp>_gpt2/allocations.csv
+runs/real_lora_releases/<run_id>.tar.gz
+runs/real_lora_releases/<run_id>.tar.gz.sha256
 ```
 
-## Step 3: first real validation run
+Required final messages are:
+
+```text
+Real LoRA run validation: PASS
+Real LoRA release validation: PASS
+Real LoRA release build: PASS
+Real LoRA protocol smoke release: PASS
+```
+
+Smoke results verify execution only. They must not be imported into the paper.
+
+## Manual source-run validation
 
 ```bash
-cd Code/real_lora_validation
-./scripts/run_gpt2_validation.sh 2>&1 | tee gpt2_validation_$(date +%Y%m%d_%H%M%S).log
+python scripts/validate_real_lora_run.py \
+  runs/real_lora_source_runs/<run_id> \
+  --expected-kind smoke
 ```
 
-Outputs:
-
-```text
-real_lora_runs/<timestamp>_gpt2/results.csv
-real_lora_runs/<timestamp>_gpt2/summary.txt
-real_lora_runs/<timestamp>_gpt2/train_history_*.csv
-```
-
-Interpretation:
-
-- If `spectral_effective` beats `uniform_r4` and `gradient_norm` under the same
-  trainable-parameter budget cap, the paper has real-model positive evidence.
-- If it loses, this is still useful: it defines a boundary between synthetic and
-  pretrained-LM behavior.
-- If it ties with fewer or similar effective ranks concentrated in plausible
-  modules, inspect `allocations.csv` and `calibration_metrics.csv` before judging.
-
-## Useful monitoring
+## Manual release validation
 
 ```bash
-watch -n 10 'find real_lora_runs -maxdepth 2 -type f \( -name results.csv -o -name summary.txt -o -name "train_history_*.csv" \) -printf "%TY-%Tm-%Td %TH:%TM %p\n" | sort | tail -30'
+python scripts/validate_real_lora_release.py \
+  runs/real_lora_releases/<run_id> \
+  --expected-kind smoke
+
+(
+  cd runs/real_lora_releases
+  sha256sum -c <run_id>.tar.gz.sha256
+)
 ```
 
-## Notes
+## Publication-run requirements
 
-Default target suffixes are GPT-2-style:
+Passing `--run_kind publication` activates hard input and protocol gates. A
+publication run must use:
 
-```text
-c_attn,c_proj,c_fc
-```
+- a local pinned model path;
+- local train and validation text files;
+- `--local_files_only`;
+- `--deterministic_algorithms`; and
+- `--include_identity_control`.
 
-For LLaMA/Qwen-style models, use suffixes such as:
-
-```text
-q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
-```
-
-
-## Reproducing the released GPT-2/Wikitext results
-
-The clean release does not bundle GPT-2 model weights, Wikitext local text files, or raw `real_lora_runs/` folders.  The released summaries under `results/released/` are the compact artifacts used by the paper.
-
-To rerun the real validation, prepare local files with this layout:
-
-```text
-models/gpt2_local/
-  config.json
-  generation_config.json
-  model.safetensors
-  vocab.json
-  merges.txt
-  tokenizer_config.json
-  special_tokens_map.json
-
-data/wikitext2_local/
-  train.txt
-  validation.txt
-```
-
-The paper's reported real validation used Python 3.12 with ROCm PyTorch 2.9.1+rocm7.2.1, transformers 5.12.0, datasets 5.0.0, accelerate 1.14.0, peft 0.19.1, safetensors 0.8.0, tokenizers 0.22.2, and numpy 1.26.4. The tested core package list is recorded in `requirements-tested-rocm721.txt`; run `python -m pip freeze` in your environment to create a full local lockfile before reproducing long runs.
-
-The released CSVs may contain historical local `run_path`/`run_dir` strings. Treat those path strings as provenance labels only; the semantic fields for paper reproduction are the seed, strategy, validation losses, parameter counts, ranks, and pairwise differences.
-
-## Effective-rank correction workflow
-
-The entropy effective-rank statistic now uses normalized spectral energy:
-
-```text
-p_i = sigma_i^2 / sum_j sigma_j^2
-effective_rank = exp(-sum_i p_i log(p_i))
-```
-
-For a clean corrected publication rerun, use the pinned-input and full-rerun helpers:
+Example shape only—the full multi-seed publication driver is maintained
+separately from this single-source-run command:
 
 ```bash
-python scripts/prepare_publication_inputs.py
-python scripts/preflight_publication_rerun.py
-python scripts/run_publication_correction.py
+python run_real_lora_validation.py \
+  --run-id real_gpt2_seed101 \
+  --run-kind publication \
+  --model models/gpt2_local \
+  --local_files_only \
+  --dataset_mode local \
+  --train_text_file data/wikitext2_local/train.txt \
+  --val_text_file data/wikitext2_local/validation.txt \
+  --seed 101 \
+  --uniform_rank 4 \
+  --min_rank 1 \
+  --max_rank 16 \
+  --strategies uniform,gradient_norm,spectral_effective,eva_activation,fim_gradient_variance,gora_sensitivity \
+  --include_identity_control \
+  --deterministic_algorithms \
+  --out_dir runs/real_lora_source_runs
 ```
 
-The final command reruns uniform rank 4, gradient norm, and spectral effective rank
-for all five plus three paper seeds. Every strategy receives a fresh DataLoader
-with the same per-seed shuffle seed, so batch order is matched within a seed. It
-regenerates `results/released/`, imports the paper-facing table rows, and creates a
-`CORRECTED_REAL_GPT2_RESULTS_*.zip` bundle at the project root. Do not combine new
-spectral measurements with the historical control rows when a full rerun is
-feasible.
+Do not treat a single source run as an independent multi-seed result.
+
+## Legacy commands
+
+The older scripts named `run_gpt2_*`, `run_publication_correction.py`, and the
+historical released real-model tables predate the full stochastic-control and
+exact-cost protocol. They are retained only for provenance. Do not use their
+outputs as current publication evidence. `scripts/run_smoke.sh` now delegates to
+`scripts/run_protocol_smoke.sh`.

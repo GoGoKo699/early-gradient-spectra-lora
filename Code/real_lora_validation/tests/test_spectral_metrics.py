@@ -1,7 +1,11 @@
 import math
 import pytest
 import torch
-from spectral_metrics import EFFECTIVE_RANK_DEFINITION, singular_effective_rank
+from spectral_metrics import (
+    EFFECTIVE_RANK_DEFINITION,
+    entropy_effective_rank_from_energy,
+    singular_effective_rank,
+)
 
 
 def test_definition():
@@ -34,3 +38,10 @@ def test_extreme_scale_stability():
     baseline = singular_effective_rank(torch.tensor([4.0, 2.0, 1.0], dtype=torch.float64))
     assert singular_effective_rank(torch.tensor([4e200, 2e200, 1e200], dtype=torch.float64)) == pytest.approx(baseline)
     assert singular_effective_rank(torch.tensor([4e-200, 2e-200, 1e-200], dtype=torch.float64)) == pytest.approx(baseline)
+
+
+def test_entropy_effective_rank_from_energy():
+    assert entropy_effective_rank_from_energy(torch.tensor([1.0, 1.0, 0.0])) == pytest.approx(2.0)
+    assert entropy_effective_rank_from_energy(torch.zeros(3)) == 0.0
+    with pytest.raises(ValueError):
+        entropy_effective_rank_from_energy(torch.tensor([1.0, -1.0]))

@@ -177,3 +177,29 @@ Implemented:
 1. Complete or sharply narrow the real-model stochastic-control evidence.
 2. Update adaptive-rank baselines and related work.
 3. Perform final rendered-PDF, metadata, archive, and root-checksum preflight.
+
+## Step 8 — controlled real-model protocol and adaptive allocation controls
+
+Status: **implemented and unit-validated; owner smoke release required.**
+
+Implemented:
+
+- evaluation-mode calibration with gradients retained and dropout disabled;
+- named, independent model, adapter, data, dropout, and evaluation RNG streams;
+- a training RNG reset after allocation-dependent adapter and optimizer
+  construction;
+- module-name-derived maximum-rank LoRA initialization with exact nested prefixes;
+- exact trainable-parameter-cost allocation with explicit infeasibility errors;
+- raw calibration-batch, activation-component, initialization, seed, allocation,
+  and input-provenance artifacts;
+- duplicate-uniform and generalized identical-allocation invariants;
+- allocation-only EVA-style activation, FIM-LoRA-style LoRA-B-gradient, and
+  GoRA-style weight-gradient sensitivity controls, all under the same common
+  initialization and training protocol;
+- source-run and release validators with exact recursive checksum coverage;
+- deterministic portable release archives and SHA-256 sidecars; and
+- 20 passing real-model protocol unit tests.
+
+The protocol smoke is an execution and invariance gate only. No real-model
+numerical claim should be updated until the smoke archive is independently
+verified and the pre-specified multi-seed publication driver is run.
