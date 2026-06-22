@@ -20,8 +20,7 @@ superseded until the full corrected experiment is rerun.
 
 ## Step 2 — Stage4 useful-rank estimand and provenance
 
-Status: **code/test repair complete; end-to-end smoke and five-seed rerun
-required.**
+Status: **completed; five-seed release validated and imported.**
 
 Implemented:
 
@@ -39,9 +38,9 @@ Implemented:
   seed aggregates; and
 - manuscript equations aligned with the executable estimand.
 
-The bundled legacy Stage4 aggregate is now explicitly superseded. Its numerical
-claims must not be used. Run `Code/rmt_lora_sim/scripts/run_stage4_smoke.sh`
-before starting the five-seed publication run.
+The bundled legacy Stage4 aggregate is explicitly superseded. The corrected
+five-seed evidence release is the manuscript source; the legacy numerical
+claims must not be reused.
 
 ## Remaining submission blockers after Step 2
 
@@ -55,3 +54,42 @@ before starting the five-seed publication run.
 5. Complete the remaining statistical, spectral-edge, budget-matching,
    real-model stochastic-control, baseline, breadth, and release-engineering
    repairs listed in the publication audit.
+
+## Step 3 — corrected Stage4 evidence import
+
+Status: **completed by the project owner.**
+
+The validated five-seed Stage4 release was imported into the manuscript and the
+paper-facing Stage4 artifacts were rebuilt and committed. Root release checksums
+remain intentionally deferred until all scientific repairs are complete.
+
+## Step 4 — corrected synthetic-transformer experiment protocol
+
+Status: **implementation and local end-to-end release smoke complete; owner
+smoke verification and full evidence rerun still required.**
+
+Implemented:
+
+- explicit `standard`, `fixed_update_scale`, and reference-matched `rslora`
+  policies, with fixed update scale pre-specified as the primary mechanistic
+  condition;
+- common initialization, training data, exhaustive/fixed evaluation data, and
+  dropout streams across scaling conditions and allocation rules;
+- exact per-module scale/effective-alpha provenance and scaling-stratified
+  useful-rank targets, fits, aggregates, whitening summaries, and figures;
+- exhaustive evaluation of all modular-arithmetic input pairs;
+- raw permutation-null maxima, edge Monte Carlo intervals, and 0.99/0.995/0.999
+  quantile sensitivity fields;
+- a publication requirement of at least 4,096 null maxima per module, replacing
+  the former eight-sample edge;
+- same-realized-cost deterministic uniform comparators for pre-specified rules,
+  explicit candidate-to-baseline links, pre-specified primary-analysis flags,
+  and explicit cap utilization;
+- portable raw-run validation, code/environment snapshots, recursive SHA-256
+  manifests, archive sidecars, and tamper-detecting release validation; and
+- 22 passing transformer unit tests plus a complete local packaged smoke.
+
+The smoke configuration is only an execution gate; its metrics are not evidence.
+Do not update the manuscript or run the expensive multi-seed study until the
+owner-generated smoke archive has been independently verified. The next gate is
+the pre-specified multi-task publication driver and run-cluster inference.

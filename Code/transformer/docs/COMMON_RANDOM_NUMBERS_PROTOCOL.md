@@ -13,8 +13,8 @@ A budget comparison block is identified by:
 (base seed, task, parameter budget, adaptation replicate)
 ```
 
-The allocation-rule name is deliberately excluded. Every rule in the same
-block receives the same:
+The allocation-rule name and rank-scaling policy are deliberately excluded.
+Every rule and scaling condition in the same block receives the same:
 
 - frozen base-model state;
 - maximum-rank LoRA initialization bank;
@@ -59,8 +59,9 @@ preferable when feasible.
 
 ## Runtime invariant
 
-The runner groups result rows by budget, adaptation replicate, and complete
-allocation signature. If two rule names produce the same allocation but yield
+The runner groups result rows by scaling policy, budget, adaptation replicate,
+and complete allocation signature. If two rule names produce the same
+allocation under one scaling policy but yield
 different metrics under the shared streams, the run aborts. This is a protocol
 failure, not a result to average away.
 
@@ -81,8 +82,10 @@ From `Code/transformer`:
 
 ```bash
 PYTHONPATH=. python3 -m pytest -q tests
-bash scripts/run_smoke.sh
+bash scripts/run_rank_scaling_smoke.sh
 ```
 
 For every group with an identical `allocation_signature` inside one comparison
 block, the loss and accuracy ranges must be zero within numerical tolerance.
+Rank-zero conditions and all conditions at the declared common reference rank
+are also required to produce identical metrics across scaling policies.

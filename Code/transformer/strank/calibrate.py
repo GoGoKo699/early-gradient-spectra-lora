@@ -9,7 +9,8 @@ import torch
 from .model import LoRALinear, iter_lora_modules
 from .tasks import TaskSpec, make_batch
 from .train import loss_fn
-from .spectral import permutation_edge, summarize_matrix
+from .spectral import permutation_edge_diagnostics, summarize_matrix
+from .utils import stable_seed
 
 
 @dataclass
@@ -45,8 +46,21 @@ def inv_sqrt(mat: np.ndarray, whitening: str, lambda_scale: float) -> np.ndarray
     raise ValueError(f"unknown whitening={whitening}")
 
 
-def calibrate_module_spectra(model, task: TaskSpec, cfg: Dict, site_names: List[str], device: torch.device, seed: int = 0):
-    model.train()
+def calibrate_module_spectra(
+    model,
+    task: TaskSpec,
+    cfg: Dict,
+    site_names: List[str],
+    device: torch.device,
+    seed: int = 0,
+    *,
+    data_seed: int | None = None,
+    return_null_maxima: bool = False,
+):
+    # Evaluation mode disables dropout while retaining gradients. Preserve the
+    # caller's mode so calibration has no hidden stateful side effect.
+    was_training = bool(model.training)
+    model.eval()
     sites = select_sites(model, site_names)
     max_tokens_per_site = int(cfg.get("max_tokens_per_site", 0) or 0)
     accums: Dict[str, Accum] = {}
@@ -96,25 +110,33 @@ def calibrate_module_spectra(model, task: TaskSpec, cfg: Dict, site_names: List[
 
     batches = int(cfg.get("batches", 4))
     batch_size = int(cfg.get("batch_size", task.params.get("train_batch_size", 64)))
-    for _ in range(batches):
-        x, y = make_batch(task, batch_size, device)
-        model.zero_grad(set_to_none=True)
-        loss = loss_fn(model(x), y)
-        loss.backward()
-        if max_tokens_per_site > 0 and all(
-            a.n_tokens >= max_tokens_per_site for a in accums.values()
-        ):
-            break
-
-    for h in handles:
-        h.remove()
+    generator_device = device if device.type == "cuda" else torch.device("cpu")
+    data_generator = torch.Generator(device=generator_device)
+    data_generator.manual_seed(int(seed if data_seed is None else data_seed))
+    try:
+        for _ in range(batches):
+            x, y = make_batch(task, batch_size, device, generator=data_generator)
+            model.zero_grad(set_to_none=True)
+            loss = loss_fn(model(x), y)
+            loss.backward()
+            if max_tokens_per_site > 0 and all(
+                a.n_tokens >= max_tokens_per_site for a in accums.values()
+            ):
+                break
+    finally:
+        for handle in handles:
+            handle.remove()
+        model.train(was_training)
 
     rows = []
     sv_dict = {}
+    null_dict = {}
     whitening = str(cfg.get("whitening", "diag"))
     lambda_scale = float(cfg.get("lambda_scale", 0.01))
     n_boot = int(cfg.get("null_bootstrap", 8))
     quantile = float(cfg.get("null_quantile", 0.995))
+    uncertainty_resamples = int(cfg.get("null_uncertainty_resamples", 1000))
+    uncertainty_confidence = float(cfg.get("null_uncertainty_confidence", 0.95))
 
     for name, a in accums.items():
         n = max(a.n_tokens, 1)
@@ -126,10 +148,19 @@ def calibrate_module_spectra(model, task: TaskSpec, cfg: Dict, site_names: List[
         G = (a.g / max(a.n_batches, 1)).detach().cpu().numpy()
         W = inv_sqrt(C, whitening=whitening, lambda_scale=lambda_scale)
         M = -G @ W
-        edge = permutation_edge(M, n_boot=n_boot, quantile=quantile, seed=seed + len(rows))
-        summary = summarize_matrix(M, edge=edge)
+        site_null_seed = stable_seed(int(seed), "permutation_null", name)
+        edge_diagnostics, null_maxima = permutation_edge_diagnostics(
+            M,
+            n_boot=n_boot,
+            quantile=quantile,
+            seed=site_null_seed,
+            uncertainty_resamples=uncertainty_resamples,
+            uncertainty_confidence=uncertainty_confidence,
+        )
+        summary = summarize_matrix(M, edge=float(edge_diagnostics["edge"]))
         mod = sites[name]
         sv_dict[name] = summary.pop("singular_values")
+        null_dict[name] = null_maxima
         rows.append({
             "site_name": name,
             "d_in": mod.in_features,
@@ -138,9 +169,15 @@ def calibrate_module_spectra(model, task: TaskSpec, cfg: Dict, site_names: List[
             "n_batches": a.n_batches,
             "whitening": whitening,
             "lambda_scale": lambda_scale,
+            "calibration_data_seed": int(seed if data_seed is None else data_seed),
+            "permutation_seed": site_null_seed,
+            "dropout_disabled_during_calibration": True,
+            **edge_diagnostics,
             "gradient_norm": float(np.linalg.norm(G)),
             "cov_trace": float(np.trace(C)),
             "cov_effective_rank": float((np.trace(C) ** 2) / (np.sum(C * C) + 1e-12)),
             **summary,
         })
+    if return_null_maxima:
+        return rows, sv_dict, null_dict
     return rows, sv_dict

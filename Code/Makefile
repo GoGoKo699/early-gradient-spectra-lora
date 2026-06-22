@@ -1,4 +1,4 @@
-.PHONY: stage4-to-paper stage4-release-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer real-lora-to-paper paper-artifacts paper clean-paper
+.PHONY: stage4-to-paper stage4-release-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer smoke-transformer-scaling real-lora-to-paper paper-artifacts paper clean-paper
 
 RMT_SMOKE_CFG = configs/smoke
 
@@ -20,6 +20,9 @@ smoke-rmt:
 
 smoke-transformer:
 	cd transformer && PYTHONPATH=. python3 scripts/run_synthetic_transformer.py --config configs/smoke_modular.yaml
+
+smoke-transformer-scaling:
+	cd transformer && bash scripts/run_rank_scaling_smoke.sh
 
 stage4-release-to-paper:
 	@echo "ERROR: bundled Stage4 aggregate is superseded; run rmt_lora_sim/scripts/run_stage4.sh" >&2

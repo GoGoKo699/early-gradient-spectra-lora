@@ -208,3 +208,70 @@ def allocation_cost(module_stats: pd.DataFrame, alloc: Dict[str, int]) -> int:
     for row in module_stats.itertuples(index=False):
         cost += module_cost(row) * int(alloc.get(row.site_name, 0))
     return int(cost)
+
+
+def uniform_exact_cost_allocations(
+    module_stats: pd.DataFrame,
+    rank_grid: List[int],
+    target_costs: List[int],
+) -> Dict[int, Dict[str, int]]:
+    """Construct deterministic uniform-ish allocations at exact parameter costs.
+
+    Candidate methods can leave different amounts of a budget cap unused. For a
+    target cost that is known to be feasible, this dynamic program finds an
+    allocation on the same rank grid with exactly that cost while minimizing
+    unweighted rank dispersion across modules. The objective is
+    ``n * sum(r_i^2) - (sum r_i)^2``, equivalent to pairwise squared rank
+    differences. Exact objective ties use lexicographic site/rank order.
+    """
+    rows = sorted(module_stats.itertuples(index=False), key=lambda row: str(row.site_name))
+    sites = [str(row.site_name) for row in rows]
+    costs = [module_cost(row) for row in rows]
+    grid = sorted(set(int(value) for value in rank_grid))
+    if not grid or grid[0] != 0:
+        raise ValueError("rank_grid must include rank 0 for exact-cost baselines")
+    requested = sorted(set(int(value) for value in target_costs))
+    if any(value < 0 for value in requested):
+        raise ValueError("target costs must be non-negative")
+    if not requested:
+        return {}
+    max_target = max(requested)
+
+    # (cost, rank_sum) -> (rank_square_sum, rank_tuple)
+    states: dict[tuple[int, int], tuple[int, tuple[int, ...]]] = {(0, 0): (0, ())}
+    for site_cost in costs:
+        next_states: dict[tuple[int, int], tuple[int, tuple[int, ...]]] = {}
+        for (spent, rank_sum), (rank_sq_sum, ranks) in states.items():
+            for rank in grid:
+                new_cost = spent + site_cost * rank
+                if new_cost > max_target:
+                    continue
+                key = (new_cost, rank_sum + rank)
+                value = (rank_sq_sum + rank * rank, ranks + (rank,))
+                previous = next_states.get(key)
+                if previous is None or value < previous:
+                    next_states[key] = value
+        states = next_states
+
+    result: Dict[int, Dict[str, int]] = {}
+    n_sites = len(sites)
+    for target in requested:
+        candidates = []
+        for (spent, rank_sum), (rank_sq_sum, ranks) in states.items():
+            if spent != target:
+                continue
+            dispersion = n_sites * rank_sq_sum - rank_sum * rank_sum
+            candidates.append((dispersion, ranks))
+        if not candidates:
+            raise ValueError(f"no exact-cost allocation exists for target cost {target}")
+        ranks = min(candidates)[-1]
+        result[target] = dict(zip(sites, ranks))
+    return result
+
+
+def uniform_exact_cost_allocation(
+    module_stats: pd.DataFrame,
+    rank_grid: List[int],
+    target_cost: int,
+) -> Dict[str, int]:
+    return uniform_exact_cost_allocations(module_stats, rank_grid, [int(target_cost)])[int(target_cost)]

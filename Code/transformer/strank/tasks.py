@@ -108,3 +108,35 @@ def make_batch(
     if spec.name == "associative_recall":
         return batch_associative(spec, batch_size, device, generator=generator)
     raise ValueError(spec.name)
+
+
+def exact_modular_batches(
+    spec: TaskSpec,
+    batch_size: int,
+    device: torch.device,
+) -> tuple[tuple[torch.Tensor, torch.Tensor], ...]:
+    """Enumerate all modular-arithmetic input pairs exactly, in fixed order."""
+    if spec.name != "modular":
+        raise ValueError("exact enumeration is currently defined only for the modular task")
+    batch_size = int(batch_size)
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    p = int(spec.params["modulus"])
+    offset = int(spec.params["offset"])
+    plus = p
+    eq = p + 1
+    a = torch.arange(p, device=device).repeat_interleave(p)
+    b = torch.arange(p, device=device).repeat(p)
+    batches = []
+    for start in range(0, p * p, batch_size):
+        aa = a[start : start + batch_size]
+        bb = b[start : start + batch_size]
+        x = torch.empty((len(aa), spec.seq_len), dtype=torch.long, device=device)
+        x[:, 0] = aa
+        x[:, 1] = plus
+        x[:, 2] = bb
+        x[:, 3] = eq
+        y = torch.full_like(x, IGNORE_INDEX)
+        y[:, spec.label_pos] = (aa + bb + offset) % p
+        batches.append((x, y))
+    return tuple(batches)

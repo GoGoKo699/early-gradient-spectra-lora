@@ -1,0 +1,82 @@
+run:
+  name: smoke_rank_scaling
+  seed: 321
+  out_dir: runs
+  device: cpu
+  torch_threads: 1
+
+task:
+  name: modular
+  modulus: 11
+  base_offset: 0
+  adapt_offset: 2
+  seq_len: 4
+  train_batch_size: 16
+  eval_batches: 2
+
+model:
+  d_model: 16
+  n_layers: 1
+  n_heads: 2
+  d_mlp: 32
+  dropout: 0.1
+
+base_train:
+  steps: 12
+  lr: 0.003
+  weight_decay: 0.0
+  log_every: 0
+
+calibration:
+  batches: 1
+  batch_size: 16
+  whitening: diag
+  lambda_scale: 0.01
+  null_bootstrap: 16
+  null_quantile: 0.95
+  null_uncertainty_resamples: 100
+  null_uncertainty_confidence: 0.95
+  max_tokens_per_site: 64
+
+sites:
+  include:
+    - blocks.0.attn.q_proj
+    - blocks.0.mlp.fc2
+
+lora:
+  ranks: [0, 1, 2, 4]
+  alpha: 8.0
+  scaling_modes: [fixed_update_scale, standard, rslora]
+  scale_reference_rank: 4
+  lr: 0.01
+  steps: 8
+  weight_decay: 0.0
+  log_every: 0
+  grad_clip: 1.0
+
+budgets:
+  param_budgets: [64, 128]
+  rules:
+    - uniform_fill
+    - effective_rank
+    - soft_dimension
+    - gradient_norm
+  cost_matched_rules:
+    - effective_rank
+    - soft_dimension
+    - gradient_norm
+
+targets:
+  near_best_gaps: [0.1]
+  recovery_fracs: [0.8]
+  penalty_lambdas: [0.2]
+
+protocol:
+  adaptation_replicates: 1
+  sweep_replicates: 1
+  primary_scaling_mode: fixed_update_scale
+  primary_allocation_rule: soft_dimension
+  primary_reference_rule: uniform_exact_cost
+  primary_metric: final_val_loss
+  independent_unit: task_seed_run
+  exact_modular_evaluation: true

@@ -3,47 +3,57 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
-
-def infer_seed_from_run(run_dir: Path) -> int | None:
-    cfg = run_dir / "config.yaml"
-    if cfg.exists():
-        text = cfg.read_text(encoding="utf-8", errors="ignore")
-        m = re.search(r"\n\s*seed:\s*(\d+)", "\n" + text)
-        if m:
-            return int(m.group(1))
-    m = re.search(r"_s(\d+)", run_dir.name)
-    return int(m.group(1)) if m else None
-
-
-def collect_runs(root: Path, patterns: list[str]) -> list[Path]:
-    runs = []
-    for pat in patterns:
-        for p in root.glob(pat):
-            if (p / "budget" / "budget_results.csv").exists():
-                runs.append(p)
-    return sorted(set(runs), key=lambda p: p.name)
+from scripts.aggregate_step3_replicates import (
+    _common_non_null,
+    _normalise_protocol_columns,
+    _run_level_budget,
+    _source_manifest_entry,
+    _write_delta_outputs,
+    collect_runs,
+    infer_seed_from_run,
+    sem,
+)
 
 
-def sem(x: pd.Series) -> float:
-    x = pd.to_numeric(x, errors="coerce").dropna()
-    if len(x) <= 1:
-        return 0.0
-    return float(x.std(ddof=1) / np.sqrt(len(x)))
+def _task_family(run_dir: Path) -> str:
+    info_path = run_dir / "run_info.json"
+    if info_path.is_file():
+        info = json.loads(info_path.read_text(encoding="utf-8"))
+        return str(info.get("task_name", "unknown"))
+    name = run_dir.name.lower()
+    if "assoc" in name:
+        return "associative_recall"
+    if "modular" in name:
+        return "modular"
+    return "unknown"
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Aggregate synthetic-transformer tasks with nested adaptation replicates.")
-    ap.add_argument("--runs-root", default="runs")
-    ap.add_argument("--out", default="step4_aggregate")
-    ap.add_argument("--patterns", nargs="*", default=["*_modular_small_step2", "*_modular_small_step3_s*", "*_assoc_small_step4_s*"])
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser(
+        description="Aggregate multiple transformer tasks using independent task/seed run clusters."
+    )
+    parser.add_argument("--runs-root", default="runs")
+    parser.add_argument("--out", default="step4_aggregate")
+    parser.add_argument(
+        "--patterns",
+        nargs="*",
+        default=[
+            "*_modular_small_step2",
+            "*_modular_small_step3_s*",
+            "*_assoc_small_step4_s*",
+        ],
+    )
+    args = parser.parse_args()
 
     root = Path(args.runs_root)
     out = Path(args.out)
@@ -51,64 +61,71 @@ def main() -> None:
     run_dirs = collect_runs(root, args.patterns)
     if not run_dirs:
         raise SystemExit(f"No matching runs found under {root} for {args.patterns}")
+    source_entries = [_source_manifest_entry(path) for path in run_dirs]
 
-    budget_frames, site_fit_frames, module_frames = [], [], []
-    base_frames, target_frames, alloc_frames = [], [], []
-    for rd in run_dirs:
-        seed = infer_seed_from_run(rd)
-        run_name = rd.name
-        task_family = "assoc" if "assoc" in run_name else ("modular" if "modular" in run_name else "unknown")
+    budget_frames: list[pd.DataFrame] = []
+    site_fit_frames: list[pd.DataFrame] = []
+    module_frames: list[pd.DataFrame] = []
+    base_frames: list[pd.DataFrame] = []
+    target_frames: list[pd.DataFrame] = []
+    allocation_frames: list[pd.DataFrame] = []
+    for run_dir in run_dirs:
+        seed = infer_seed_from_run(run_dir)
+        run_name = run_dir.name
+        task_family = _task_family(run_dir)
 
-        def add_meta(df: pd.DataFrame) -> pd.DataFrame:
-            df = df.copy()
-            df.insert(0, "run", run_name)
-            df.insert(1, "seed", seed)
-            df.insert(2, "task_family", task_family)
-            return df
+        def add_meta(frame: pd.DataFrame) -> pd.DataFrame:
+            frame = frame.copy()
+            frame.insert(0, "run", run_name)
+            frame.insert(1, "seed", seed)
+            frame.insert(2, "task_family", task_family)
+            return frame
 
-        budget_frames.append(add_meta(pd.read_csv(rd / "budget" / "budget_results.csv")))
-        if (rd / "budget" / "allocation_comparison.csv").exists():
-            alloc_frames.append(add_meta(pd.read_csv(rd / "budget" / "allocation_comparison.csv")))
-        if (rd / "sweeps" / "site_prediction_fit.csv").exists():
-            site_fit_frames.append(add_meta(pd.read_csv(rd / "sweeps" / "site_prediction_fit.csv")))
-        if (rd / "sweeps" / "site_target_summary.csv").exists():
-            target_frames.append(add_meta(pd.read_csv(rd / "sweeps" / "site_target_summary.csv")))
-        if (rd / "calibration" / "module_stats.csv").exists():
-            module_frames.append(add_meta(pd.read_csv(rd / "calibration" / "module_stats.csv")))
-        if (rd / "base" / "base_metrics.csv").exists():
-            base_frames.append(add_meta(pd.read_csv(rd / "base" / "base_metrics.csv")))
+        budget_frames.append(add_meta(pd.read_csv(run_dir / "budget" / "budget_results.csv")))
+        optional = [
+            ("budget/allocation_comparison.csv", allocation_frames),
+            ("sweeps/site_prediction_fit.csv", site_fit_frames),
+            ("sweeps/site_target_summary.csv", target_frames),
+            ("calibration/module_stats.csv", module_frames),
+            ("base/base_metrics.csv", base_frames),
+        ]
+        for relative, destination in optional:
+            path = run_dir / relative
+            if path.exists():
+                destination.append(add_meta(pd.read_csv(path)))
 
-    budget = pd.concat(budget_frames, ignore_index=True)
-    if "adaptation_replicate" not in budget:
-        budget["adaptation_replicate"] = 0
-    budget["adaptation_replicate"] = pd.to_numeric(budget["adaptation_replicate"], errors="raise").astype(int)
-    unique_keys = ["task_family", "run", "budget", "adaptation_replicate", "rule"]
-    if budget.duplicated(unique_keys).any():
-        raise ValueError(f"duplicate budget rows for keys {unique_keys}")
+    budget = _normalise_protocol_columns(pd.concat(budget_frames, ignore_index=True))
     budget.to_csv(out / "all_budget_results.csv", index=False)
-
     for frames, filename in [
         (base_frames, "all_base_metrics.csv"),
         (module_frames, "all_module_stats.csv"),
         (site_fit_frames, "all_site_prediction_fit.csv"),
         (target_frames, "all_site_target_summary.csv"),
-        (alloc_frames, "all_allocation_comparison.csv"),
+        (allocation_frames, "all_allocation_comparison.csv"),
     ]:
         if frames:
             pd.concat(frames, ignore_index=True).to_csv(out / filename, index=False)
 
-    run_budget = budget.groupby(["task_family", "run", "seed", "rule", "budget"], dropna=False, as_index=False).agg(
-        n_adaptation_replicates=("adaptation_replicate", "nunique"),
-        actual_cost=("actual_cost", "mean"),
-        final_val_loss=("final_val_loss", "mean"),
-        final_val_accuracy=("final_val_accuracy", "mean"),
-        diverged_count=("diverged", "sum"),
-    )
+    run_budget = _run_level_budget(budget, extra_keys=["task_family"])
     run_budget.to_csv(out / "run_level_budget_results.csv", index=False)
-    summary = run_budget.groupby(["task_family", "rule", "budget"], as_index=False).agg(
+    summary = run_budget.groupby(
+        [
+            "task_family",
+            "scaling_mode",
+            "condition_id",
+            "rule",
+            "allocation_rule",
+            "comparison_role",
+            "is_primary_allocation_rule",
+            "budget",
+        ],
+        dropna=False,
+        as_index=False,
+    ).agg(
         n_runs=("run", "nunique"),
         mean_adaptation_replicates=("n_adaptation_replicates", "mean"),
         mean_actual_cost=("actual_cost", "mean"),
+        mean_requested_budget=("requested_budget", "mean"),
         mean_val_loss=("final_val_loss", "mean"),
         sem_val_loss=("final_val_loss", sem),
         median_val_loss=("final_val_loss", "median"),
@@ -118,106 +135,110 @@ def main() -> None:
         diverged_count=("diverged_count", "sum"),
     )
     summary.to_csv(out / "budget_summary.csv", index=False)
+    delta_outputs = _write_delta_outputs(budget, out, extra_keys=["task_family"])
 
-    pair_keys = ["task_family", "run", "budget", "adaptation_replicate"]
-    ref = budget[budget["rule"] == "uniform_fill"][pair_keys + ["final_val_loss", "final_val_accuracy", "actual_cost"]].rename(columns={
-        "final_val_loss": "uniform_fill_loss",
-        "final_val_accuracy": "uniform_fill_accuracy",
-        "actual_cost": "uniform_fill_cost",
-    })
-    if ref.duplicated(pair_keys).any():
-        raise ValueError("uniform_fill must have one row per task, run, budget, and adaptation replicate")
-    deltas = budget[budget["rule"] != "uniform_fill"].merge(ref, on=pair_keys, how="inner", validate="many_to_one")
-    deltas["loss_delta_vs_uniform_fill"] = deltas["final_val_loss"] - deltas["uniform_fill_loss"]
-    deltas["acc_delta_vs_uniform_fill"] = deltas["final_val_accuracy"] - deltas["uniform_fill_accuracy"]
-    deltas["loss_ratio_vs_uniform_fill"] = deltas["final_val_loss"] / deltas["uniform_fill_loss"].replace(0, np.nan)
-    keep = [
-        "task_family", "run", "seed", "budget", "adaptation_replicate", "rule",
-        "loss_delta_vs_uniform_fill", "acc_delta_vs_uniform_fill", "loss_ratio_vs_uniform_fill",
-        "actual_cost", "uniform_fill_cost",
+    winner_source = run_budget[
+        ~run_budget["comparison_role"].astype(str).eq("exact_cost_baseline")
     ]
-    deltas = deltas[keep]
-    if not deltas.empty:
-        deltas.to_csv(out / "deltas_vs_uniform_fill.csv", index=False)
-        run_deltas = deltas.groupby(["task_family", "run", "seed", "rule", "budget"], dropna=False, as_index=False).agg(
-            n_adaptation_replicates=("adaptation_replicate", "nunique"),
-            loss_delta_vs_uniform_fill=("loss_delta_vs_uniform_fill", "mean"),
-            acc_delta_vs_uniform_fill=("acc_delta_vs_uniform_fill", "mean"),
-            loss_ratio_vs_uniform_fill=("loss_ratio_vs_uniform_fill", "mean"),
-            actual_cost=("actual_cost", "mean"),
-            uniform_fill_cost=("uniform_fill_cost", "mean"),
-        )
-        run_deltas.to_csv(out / "run_level_deltas_vs_uniform_fill.csv", index=False)
-        run_deltas.groupby(["task_family", "rule", "budget"], as_index=False).agg(
-            n_runs=("run", "nunique"),
-            mean_loss_delta=("loss_delta_vs_uniform_fill", "mean"),
-            sem_loss_delta=("loss_delta_vs_uniform_fill", sem),
-            median_loss_delta=("loss_delta_vs_uniform_fill", "median"),
-            mean_acc_delta=("acc_delta_vs_uniform_fill", "mean"),
-            sem_acc_delta=("acc_delta_vs_uniform_fill", sem),
-            median_acc_delta=("acc_delta_vs_uniform_fill", "median"),
-            mean_loss_ratio=("loss_ratio_vs_uniform_fill", "mean"),
-        ).to_csv(out / "delta_summary_vs_uniform_fill.csv", index=False)
-
     winners = []
-    for (task_family, run, budget_id), group in run_budget.groupby(["task_family", "run", "budget"]):
+    for (task_family, run, scaling_mode, budget_id), group in winner_source.groupby(
+        ["task_family", "run", "scaling_mode", "budget"]
+    ):
         best_loss = group.loc[group["final_val_loss"].idxmin()]
-        best_acc = group.loc[group["final_val_accuracy"].idxmax()]
-        winners.append({
-            "task_family": task_family,
-            "run": run,
-            "seed": best_loss.get("seed"),
-            "budget": budget_id,
-            "best_loss_rule": best_loss["rule"],
-            "best_loss": best_loss["final_val_loss"],
-            "best_acc_rule": best_acc["rule"],
-            "best_accuracy": best_acc["final_val_accuracy"],
-        })
-    win = pd.DataFrame(winners)
-    win.to_csv(out / "winner_by_budget_run.csv", index=False)
-    win.groupby(["task_family", "budget", "best_loss_rule"], as_index=False).size().rename(columns={"size": "count"}).to_csv(out / "winner_counts_by_budget.csv", index=False)
+        best_accuracy = group.loc[group["final_val_accuracy"].idxmax()]
+        winners.append(
+            {
+                "task_family": task_family,
+                "run": run,
+                "seed": best_loss.get("seed"),
+                "scaling_mode": scaling_mode,
+                "budget": budget_id,
+                "best_loss_condition_id": best_loss["condition_id"],
+                "best_loss_rule": best_loss["allocation_rule"],
+                "best_loss": best_loss["final_val_loss"],
+                "best_accuracy_condition_id": best_accuracy["condition_id"],
+                "best_accuracy_rule": best_accuracy["allocation_rule"],
+                "best_accuracy": best_accuracy["final_val_accuracy"],
+            }
+        )
+    winner_frame = pd.DataFrame(winners)
+    winner_frame.to_csv(out / "winner_by_budget_run.csv", index=False)
+    winner_frame.groupby(
+        ["task_family", "scaling_mode", "budget", "best_loss_rule"], as_index=False
+    ).size().rename(columns={"size": "count"}).to_csv(
+        out / "winner_counts_by_budget.csv", index=False
+    )
 
     if site_fit_frames:
         fits = pd.concat(site_fit_frames, ignore_index=True)
-        fits.groupby(["task_family", "target", "predictor"], as_index=False).agg(
+        if "scaling_mode" not in fits:
+            fits["scaling_mode"] = "standard"
+        fits.groupby(
+            ["task_family", "scaling_mode", "target", "predictor"], as_index=False
+        ).agg(
             n_runs=("run", "nunique"),
             mean_spearman=("spearman", "mean"),
             sem_spearman=("spearman", sem),
             median_spearman=("spearman", "median"),
-        ).sort_values(["task_family", "target", "mean_spearman"], ascending=[True, True, False]).to_csv(out / "site_prediction_summary.csv", index=False)
+        ).sort_values(
+            ["task_family", "scaling_mode", "target", "mean_spearman"],
+            ascending=[True, True, True, False],
+        ).to_csv(out / "site_prediction_summary.csv", index=False)
 
-    fig_dir = out / "figures"
-    fig_dir.mkdir(exist_ok=True)
-    for task_family, task_summary in summary.groupby("task_family"):
+    figure_dir = out / "figures"
+    figure_dir.mkdir(exist_ok=True)
+    cap_summary = summary[
+        ~summary["comparison_role"].astype(str).eq("exact_cost_baseline")
+    ]
+    for (task_family, scaling_mode), task_summary in cap_summary.groupby(
+        ["task_family", "scaling_mode"]
+    ):
         plt.figure(figsize=(8, 5))
-        for rule, group in task_summary.groupby("rule"):
+        for condition_id, group in task_summary.groupby("condition_id"):
             group = group.sort_values("budget")
-            plt.errorbar(group["budget"], group["mean_val_loss"], yerr=group["sem_val_loss"], marker="o", capsize=3, label=rule)
-        plt.xlabel("parameter budget")
-        plt.ylabel("mean validation loss across base runs")
-        plt.title(f"Budgeted allocation: {task_family}")
+            plt.errorbar(
+                group["budget"],
+                group["mean_val_loss"],
+                yerr=group["sem_val_loss"],
+                marker="o",
+                capsize=3,
+                label=condition_id,
+            )
+        plt.xlabel("parameter budget cap")
+        plt.ylabel("mean validation loss across independent runs")
+        plt.title(f"Budgeted allocation: {task_family}, {scaling_mode}")
         plt.legend(fontsize=8)
         plt.tight_layout()
-        plt.savefig(fig_dir / f"budget_loss_summary_{task_family}.png", dpi=160)
+        plt.savefig(
+            figure_dir / f"budget_loss_summary_{task_family}_{scaling_mode}.png",
+            dpi=160,
+        )
         plt.close()
 
-        plt.figure(figsize=(8, 5))
-        for rule, group in task_summary.groupby("rule"):
-            group = group.sort_values("budget")
-            plt.errorbar(group["budget"], group["mean_val_accuracy"], yerr=group["sem_val_accuracy"], marker="o", capsize=3, label=rule)
-        plt.xlabel("parameter budget")
-        plt.ylabel("mean validation accuracy across base runs")
-        plt.title(f"Budgeted allocation accuracy: {task_family}")
-        plt.legend(fontsize=8)
-        plt.tight_layout()
-        plt.savefig(fig_dir / f"budget_accuracy_summary_{task_family}.png", dpi=160)
-        plt.close()
-
-    (out / "manifest.json").write_text(json.dumps({
+    task_counts = {
+        task: int(count)
+        for task, count in pd.Series([_task_family(path) for path in run_dirs]).value_counts().items()
+    }
+    manifest = {
         "n_independent_runs": len(run_dirs),
-        "runs": [str(p) for p in run_dirs],
-        "unit_of_inference": "base-model run within task; adaptation replicates averaged within run",
-    }, indent=2), encoding="utf-8")
+        "independent_runs_by_task": task_counts,
+        "runs": [str(path) for path in run_dirs],
+        "source_runs": source_entries,
+        "protocol_version": _common_non_null(source_entries, "protocol_version"),
+        "primary_scaling_mode": _common_non_null(source_entries, "primary_scaling_mode"),
+        "primary_allocation_rule": _common_non_null(source_entries, "primary_allocation_rule"),
+        "primary_reference_rule": _common_non_null(source_entries, "primary_reference_rule"),
+        "primary_metric": _common_non_null(source_entries, "primary_metric"),
+        "independent_unit": _common_non_null(source_entries, "independent_unit"),
+        "unit_of_inference": (
+            "task/base-model seed run; adaptation replicates are averaged within run and "
+            "budgets are clustered within run for across-budget summaries"
+        ),
+        "scaling_modes": sorted(budget["scaling_mode"].astype(str).unique().tolist()),
+        "scaling_conditions_analyzed_separately": True,
+        "exact_cost_primary_outputs": bool(delta_outputs.get("exact") is not None),
+    }
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"aggregated {len(run_dirs)} independent runs")
     print(f"wrote {out}")
 

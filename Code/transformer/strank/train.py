@@ -5,7 +5,7 @@ from typing import Dict, Sequence, Tuple
 import torch
 import torch.nn.functional as F
 
-from .tasks import IGNORE_INDEX, TaskSpec, make_batch
+from .tasks import IGNORE_INDEX, TaskSpec, exact_modular_batches, make_batch
 from .model import freeze_base_enable_lora, lora_parameters, lora_parameter_count
 
 Batch = Tuple[torch.Tensor, torch.Tensor]
@@ -44,6 +44,21 @@ def materialize_batches(
     )
 
 
+def materialize_evaluation_batches(
+    task: TaskSpec,
+    batch_size: int,
+    batches: int,
+    device: torch.device,
+    seed: int,
+    *,
+    exact_modular: bool = False,
+) -> Tuple[Batch, ...]:
+    """Create a fixed evaluation set, optionally enumerating modular inputs."""
+    if exact_modular and task.name == "modular":
+        return exact_modular_batches(task, batch_size, device)
+    return materialize_batches(task, batch_size, batches, device, seed)
+
+
 @torch.no_grad()
 def evaluate(
     model,
@@ -69,14 +84,17 @@ def evaluate(
     for x, y in batch_iter:
         logits = model(x)
         loss = loss_fn(logits, y)
-        total_loss += float(loss.item())
         mask = y != IGNORE_INDEX
+        count = int(mask.sum().item())
+        total_loss += float(loss.item()) * count
         pred = logits.argmax(dim=-1)
         total_correct += int((pred[mask] == y[mask]).sum().item())
-        total_count += int(mask.sum().item())
+        total_count += count
     return {
-        "loss": total_loss / max(n_batches, 1),
+        "loss": total_loss / max(total_count, 1),
         "accuracy": total_correct / max(total_count, 1),
+        "n_examples": int(total_count),
+        "n_batches": int(n_batches),
     }
 
 
@@ -139,7 +157,14 @@ def train_lora(
             device,
             fixed_batches=validation_batches,
         )
-        return {"train_loss_last": metrics["loss"], "val_loss": metrics["loss"], "val_accuracy": metrics["accuracy"], "trainable_params": 0}, False
+        return {
+            "train_loss_last": metrics["loss"],
+            "val_loss": metrics["loss"],
+            "val_accuracy": metrics["accuracy"],
+            "val_n_examples": metrics["n_examples"],
+            "val_n_batches": metrics["n_batches"],
+            "trainable_params": 0,
+        }, False
     if dropout_seed is not None:
         _set_torch_rng(dropout_seed)
     opt = torch.optim.AdamW(params, lr=float(cfg.get("lr", 0.01)), weight_decay=float(cfg.get("weight_decay", 0.0)))
@@ -176,4 +201,11 @@ def train_lora(
         device,
         fixed_batches=validation_batches,
     )
-    return {"train_loss_last": float(last_loss if last_loss is not None else val["loss"]), "val_loss": val["loss"], "val_accuracy": val["accuracy"], "trainable_params": lora_parameter_count(model)}, diverged
+    return {
+        "train_loss_last": float(last_loss if last_loss is not None else val["loss"]),
+        "val_loss": val["loss"],
+        "val_accuracy": val["accuracy"],
+        "val_n_examples": val["n_examples"],
+        "val_n_batches": val["n_batches"],
+        "trainable_params": lora_parameter_count(model),
+    }, diverged

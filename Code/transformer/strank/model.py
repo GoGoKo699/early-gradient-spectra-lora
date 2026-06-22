@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .scaling import resolve_lora_scaling
+
 LoraInitBank = Dict[str, Tuple[torch.Tensor, torch.Tensor]]
 
 
@@ -18,7 +20,12 @@ class LoRALinear(nn.Module):
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.zeros(out_features)) if bias else None
         self.rank = 0
-        self.alpha = 1.0
+        self.alpha = 0.0
+        self.reference_alpha = 1.0
+        self.scaling_mode = "standard"
+        self.scale_reference_rank: int | None = None
+        self.scale_at_reference_rank: float | None = None
+        self.lora_scale = 0.0
         self.lora_A: nn.Parameter | None = None
         self.lora_B: nn.Parameter | None = None
         self.reset_parameters()
@@ -36,11 +43,24 @@ class LoRALinear(nn.Module):
         alpha: float = 1.0,
         init_scale: float = 0.01,
         *,
+        scaling_mode: str = "standard",
+        scale_reference_rank: int | None = None,
         a_init: torch.Tensor | None = None,
         b_init: torch.Tensor | None = None,
     ) -> None:
-        self.rank = int(rank)
-        self.alpha = float(alpha)
+        resolved = resolve_lora_scaling(
+            rank,
+            reference_alpha=alpha,
+            scaling_mode=scaling_mode,
+            reference_rank=scale_reference_rank,
+        )
+        self.rank = resolved.rank
+        self.alpha = resolved.effective_alpha
+        self.reference_alpha = resolved.reference_alpha
+        self.scaling_mode = resolved.scaling_mode
+        self.scale_reference_rank = resolved.reference_rank
+        self.scale_at_reference_rank = resolved.scale_at_reference_rank
+        self.lora_scale = resolved.lora_scale
         if self.rank <= 0:
             self.lora_A = None
             self.lora_B = None
@@ -79,13 +99,15 @@ class LoRALinear(nn.Module):
 
     def clear_lora(self) -> None:
         self.rank = 0
+        self.alpha = 0.0
+        self.lora_scale = 0.0
         self.lora_A = None
         self.lora_B = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = F.linear(x, self.weight, self.bias)
         if self.rank > 0 and self.lora_A is not None and self.lora_B is not None:
-            y = y + (self.alpha / self.rank) * F.linear(F.linear(x, self.lora_A, None), self.lora_B, None)
+            y = y + self.lora_scale * F.linear(F.linear(x, self.lora_A, None), self.lora_B, None)
         return y
 
     def lora_parameter_count(self) -> int:
@@ -242,13 +264,21 @@ def set_lora_ranks(
     alpha: float,
     init_scale: float = 0.01,
     *,
+    scaling_mode: str = "standard",
+    scale_reference_rank: int | None = None,
     init_bank: Mapping[str, Tuple[torch.Tensor, torch.Tensor]] | None = None,
 ) -> None:
     clear_all_lora(model)
     for name, module in iter_lora_modules(model):
         r = int(ranks.get(name, 0))
         if init_bank is None or r <= 0:
-            module.set_lora(r, alpha=alpha, init_scale=init_scale)
+            module.set_lora(
+                r,
+                alpha=alpha,
+                init_scale=init_scale,
+                scaling_mode=scaling_mode,
+                scale_reference_rank=scale_reference_rank,
+            )
         else:
             if name not in init_bank:
                 raise KeyError(f"missing LoRA initialization for module {name}")
@@ -257,6 +287,8 @@ def set_lora_ranks(
                 r,
                 alpha=alpha,
                 init_scale=init_scale,
+                scaling_mode=scaling_mode,
+                scale_reference_rank=scale_reference_rank,
                 a_init=a_init,
                 b_init=b_init,
             )
