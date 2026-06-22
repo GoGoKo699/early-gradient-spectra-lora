@@ -79,3 +79,80 @@ from a smoke release or from compact legacy summaries.
 
 Root project checksums remain deferred until the final manuscript and all
 validated releases are frozen.
+
+## Pre-specified publication driver
+
+The canonical full experiment is
+`configs/transformer_publication_plan.yaml`. The plan is copied into the
+aggregate and cryptographically bound to both the aggregate manifest and the
+top-level release manifest. Generated per-task/per-seed configs also record the
+plan version, plan SHA-256, and intended release identifier.
+
+The full plan currently requires:
+
+- modular arithmetic and associative recall as distinct task families;
+- seeds `101, 103, 107, 109, 113` for every task;
+- `fixed_update_scale` as the primary scaling condition, with `standard` and
+  `rslora` retained as separate sensitivity conditions;
+- `soft_dimension` versus its linked `uniform_exact_cost` comparator;
+- final validation loss as the primary metric;
+- three adaptation replicates nested within each task/base-seed run;
+- equal weighting of the pre-specified budgets within each independent run;
+- equal weighting of the modular and associative-recall task-family means;
+- a pre-specified two-sided alpha of 0.05;
+- 10,000 within-task run-cluster bootstrap resamples and a two-sided exact
+  task-stratified sign-flip test across all ten task/seed runs, enumerating all
+  1,024 sign patterns (nominal minimum two-sided p-value 0.001953125);
+- exhaustive modular evaluation; and
+- 4,096 permutation maxima plus 2,000 edge-uncertainty resamples per module.
+
+Run a plan-only gate before execution:
+
+```bash
+PYTHONPATH=. python3 scripts/run_transformer_publication.py \
+  --plan configs/transformer_publication_plan.yaml \
+  --validate-plan-only
+```
+
+The driver requires a clean committed Git worktree, enumerates exact source-run
+paths, validates each run before it can enter the aggregate, rejects repeated
+task/seed units, and validates the finished release and archive sidecar. It
+supports `--resume`, but reuses an existing source run only after the complete
+source validator passes and only when its generated config is byte-identical to
+the pre-specified one. All child processes use the noninteractive Matplotlib
+`Agg` backend and an ignored package-local config cache to make headless runs
+deterministic with respect to display and font-cache state.
+
+The multi-task smoke plan exercises the same orchestration and aggregate
+binding with deliberately reduced computation. Its numerical values are never
+publication evidence:
+
+```bash
+bash scripts/run_transformer_publication_smoke.sh
+```
+
+The full study is launched only after the smoke archive is independently
+verified:
+
+```bash
+bash scripts/run_transformer_publication.sh
+```
+
+The aggregate must include `analysis_plan.yaml`, omnibus
+`primary_analysis.csv`, `primary_run_deltas.csv`, secondary
+`primary_analysis_by_task.csv`, exact-cost paired rows, run-level deltas,
+run-cluster deltas, and run-cluster summaries. The confirmatory estimator first
+averages budgets within each task/seed run, averages independent runs within
+each task family, and then weights the two task-family means equally. Its
+bootstrap resamples runs separately within each task; its exact sign-flip test
+uses the same task-stratified statistic. This resolves the discrete-test issue
+that would make a separate two-sided five-run test incapable of producing
+`p < 0.05`. The inference is explicitly conditional on the two pre-specified
+task families, not a claim over an unspecified population of transformer tasks.
+The release and aggregate manifests carry explicit schema versions. The release
+validator does not trust the aggregate's run-cluster table: it reconstructs the
+primary candidate/exact-uniform pairs from every released raw
+`budget_results.csv`, averages adaptation replicates and budgets in the declared
+order, and then recomputes the task summaries, omnibus estimate, interval, and
+exact test. Task-specific five-run p-values are secondary and cannot be below
+0.0625 under two-sided exact enumeration.

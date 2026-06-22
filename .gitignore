@@ -1,0 +1,17 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Local execution logs and temporary files
+*.log
+*.tmp
+
+# LaTeX build products (the top-level paper.pdf remains tracked)
+*.aux
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz

@@ -22,7 +22,11 @@ if str(ROOT) not in sys.path:
 
 from scripts.validate_rank_scaling_run import validate as validate_source_run
 from scripts.validate_transformer_release import validate_release
-from strank.protocol import SYNTHETIC_TRANSFORMER_PROTOCOL_VERSION
+from strank.protocol import (
+    SYNTHETIC_TRANSFORMER_PROTOCOL_VERSION,
+    TRANSFORMER_AGGREGATE_SCHEMA_VERSION,
+    TRANSFORMER_RELEASE_SCHEMA_VERSION,
+)
 
 PROTOCOL_VERSION = SYNTHETIC_TRANSFORMER_PROTOCOL_VERSION
 _RELEASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -62,17 +66,9 @@ def _copy_code_snapshot(destination: Path) -> None:
     )
     scripts = destination / "scripts"
     scripts.mkdir()
-    for name in (
-        "run_synthetic_transformer.py",
-        "run_whitening_ablation_from_run.py",
-        "aggregate_step3_replicates.py",
-        "aggregate_step4_tasks.py",
-        "aggregate_whitening_ablation.py",
-        "validate_rank_scaling_run.py",
-        "build_transformer_release.py",
-        "validate_transformer_release.py",
-    ):
-        shutil.copy2(ROOT / "scripts" / name, scripts / name)
+    for path in sorted((ROOT / "scripts").iterdir()):
+        if path.is_file() and path.suffix in {".py", ".sh"}:
+            shutil.copy2(path, scripts / path.name)
     configs = destination / "configs"
     configs.mkdir()
     for path in sorted((ROOT / "configs").glob("*.yaml")):
@@ -206,8 +202,12 @@ def _copy_aggregate(aggregate_dir: Path, destination: Path) -> dict:
     manifest = json.loads((aggregate_dir / "manifest.json").read_text(encoding="utf-8"))
     return {
         "relative_path": destination.relative_to(destination.parents[1]).as_posix(),
+        "aggregate_schema_version": manifest.get("aggregate_schema_version"),
         "n_independent_runs": manifest.get("n_independent_runs"),
         "unit_of_inference": manifest.get("unit_of_inference"),
+        "analysis_plan_sha256": manifest.get("analysis_plan_sha256"),
+        "analysis_plan_version": manifest.get("analysis_plan_version"),
+        "publication_release_id": manifest.get("publication_release_id"),
     }
 
 
@@ -317,12 +317,22 @@ def build_release(
                 aggregate_dir,
                 temporary_dir / "aggregate" / aggregate_dir.resolve().name,
             )
+            if (
+                aggregate_entry.get("aggregate_schema_version")
+                != TRANSFORMER_AGGREGATE_SCHEMA_VERSION
+            ):
+                raise ValueError("aggregate schema version is missing or stale")
+            if aggregate_entry.get("publication_release_id") != release_id:
+                raise ValueError(
+                    "aggregate publication_release_id does not match --release-id"
+                )
         _copy_code_snapshot(temporary_dir / "code_snapshot")
         _write_provenance(temporary_dir / "provenance", command_log)
         _write_json(
             {
                 "release_id": release_id,
                 "release_kind": release_kind,
+                "release_schema_version": TRANSFORMER_RELEASE_SCHEMA_VERSION,
                 "built_utc": datetime.now(timezone.utc).isoformat(),
                 "protocol_version": PROTOCOL_VERSION,
                 "checksum_algorithm": "sha256",

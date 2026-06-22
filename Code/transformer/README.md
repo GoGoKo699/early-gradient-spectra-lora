@@ -85,6 +85,62 @@ The smoke wrapper emits a recursive-checksum release containing raw source data,
 the exact code snapshot, environment records, and an archive checksum. See
 `docs/TRANSFORMER_RELEASE_PROTOCOL.md`.
 
+## Pre-specified multi-task evidence driver
+
+The confirmatory transformer study is defined before execution in
+`configs/transformer_publication_plan.yaml`. It fixes the task families, seeds,
+primary scaling condition, allocation rule, exact-cost reference, metric,
+independent unit, within-run budget weighting, equal weighting across the two
+pre-specified task families, confidence level, bootstrap count, and two-sided
+task-stratified sign-flip test. The driver refuses to start from a dirty Git
+worktree or from a plan that does not meet the publication design gate.
+
+Validate the plans without running experiments:
+
+```bash
+PYTHONPATH=. python3 scripts/run_transformer_publication.py \
+  --plan configs/transformer_publication_smoke_plan.yaml \
+  --validate-plan-only
+
+PYTHONPATH=. python3 scripts/run_transformer_publication.py \
+  --plan configs/transformer_publication_plan.yaml \
+  --validate-plan-only
+```
+
+Exercise the complete two-task release pipeline with non-evidential smoke
+settings:
+
+```bash
+bash scripts/run_transformer_publication_smoke.sh
+```
+
+Only after that archive passes independent verification, run the full design:
+
+```bash
+bash scripts/run_transformer_publication.sh
+```
+
+The driver uses exact source-run paths rather than glob discovery, validates
+every source run before aggregation, rejects duplicate task/seed units, binds
+generated configs and the aggregate to the analysis-plan SHA-256, and emits
+an omnibus `primary_analysis.csv`, the underlying `primary_run_deltas.csv`, and
+secondary `primary_analysis_by_task.csv` from exact-cost run-cluster summaries.
+The omnibus estimator first averages budgets within a task/seed run, then runs
+within each task, and finally gives each task family equal weight. Its interval
+resamples runs within task; its exact test flips run signs while retaining task
+strata. The full design enumerates all 1,024 sign patterns over ten independent
+runs at a pre-specified two-sided alpha of 0.05 (nominal minimum two-sided
+p-value 0.001953125). Task-specific five-run results are secondary and retain
+their coarser exact-test resolution. Inference is conditional on the two named
+task families. The release and aggregate carry explicit schema versions, and
+the release validator reconstructs the confirmatory run rows directly from
+each source run's raw exact-cost budget table before recomputing all primary
+statistics. Existing validated source runs may be reused only with `--resume`;
+invalid or partial runs are rejected.
+Subprocesses use Matplotlib's noninteractive `Agg` backend and an ignored local
+font/config cache, so headless publication runs do not depend on desktop display
+state or pollute Git provenance with cache files.
+
 ## What it tests
 
 For each candidate transformer module site `j`, the package estimates
@@ -110,9 +166,13 @@ Then it runs single-site LoRA rank sweeps and budgeted multi-site allocations.
 ```text
 scripts/run_synthetic_transformer.py    # raw source-run producer
 scripts/validate_rank_scaling_run.py    # scientific/protocol validator
+scripts/run_transformer_publication.py  # pre-specified multi-task driver
+scripts/aggregate_step4_tasks.py        # task/seed run-cluster aggregation
 scripts/build_transformer_release.py    # self-contained release builder
 scripts/validate_transformer_release.py # checksum/release validator
 scripts/run_rank_scaling_smoke.sh       # complete corrected smoke gate
+scripts/run_transformer_publication_smoke.sh # multi-task pipeline gate
+scripts/run_transformer_publication.sh  # full confirmatory experiment
 ```
 
 ## Design boundary

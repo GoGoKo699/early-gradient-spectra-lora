@@ -1,4 +1,4 @@
-.PHONY: stage4-to-paper stage4-release-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer smoke-transformer-scaling real-lora-to-paper paper-artifacts paper clean-paper
+.PHONY: stage4-to-paper stage4-release-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer smoke-transformer-scaling smoke-transformer-publication transformer-publication real-lora-to-paper paper-artifacts paper clean-paper
 
 RMT_SMOKE_CFG = configs/smoke
 
@@ -23,6 +23,12 @@ smoke-transformer:
 
 smoke-transformer-scaling:
 	cd transformer && bash scripts/run_rank_scaling_smoke.sh
+
+smoke-transformer-publication:
+	cd transformer && bash scripts/run_transformer_publication_smoke.sh
+
+transformer-publication:
+	cd transformer && bash scripts/run_transformer_publication.sh
 
 stage4-release-to-paper:
 	@echo "ERROR: bundled Stage4 aggregate is superseded; run rmt_lora_sim/scripts/run_stage4.sh" >&2

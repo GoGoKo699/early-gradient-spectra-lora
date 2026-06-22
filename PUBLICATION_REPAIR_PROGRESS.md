@@ -44,16 +44,12 @@ claims must not be reused.
 
 ## Remaining submission blockers after Step 2
 
-1. Run and validate the full corrected Stage4 five-seed release, then update all
-   Stage4 numerical claims and the compiled manuscript.
-2. Run the full corrected synthetic-transformer experiment and replace all
+1. Run the full corrected synthetic-transformer experiment and replace all
    allocation, whitening, and win-count claims.
-3. Add scaling-controlled transformer conditions before making a mechanistic
-   rank-demand claim.
-4. Correct the factorized gradient-flow statement in the appendix.
-5. Complete the remaining statistical, spectral-edge, budget-matching,
-   real-model stochastic-control, baseline, breadth, and release-engineering
-   repairs listed in the publication audit.
+2. Correct the factorized gradient-flow statement in the appendix.
+3. Complete the real-model stochastic-control rerun.
+4. Update practical baselines and related work.
+5. Finish release metadata, manuscript claim narrowing, and rendered-PDF review.
 
 ## Step 3 — corrected Stage4 evidence import
 
@@ -65,8 +61,8 @@ remain intentionally deferred until all scientific repairs are complete.
 
 ## Step 4 — corrected synthetic-transformer experiment protocol
 
-Status: **implementation and local end-to-end release smoke complete; owner
-smoke verification and full evidence rerun still required.**
+Status: **owner smoke archive independently verified; full evidence rerun still
+required.**
 
 Implemented:
 
@@ -89,7 +85,48 @@ Implemented:
   manifests, archive sidecars, and tamper-detecting release validation; and
 - 22 passing transformer unit tests plus a complete local packaged smoke.
 
-The smoke configuration is only an execution gate; its metrics are not evidence.
-Do not update the manuscript or run the expensive multi-seed study until the
-owner-generated smoke archive has been independently verified. The next gate is
-the pre-specified multi-task publication driver and run-cluster inference.
+The owner-generated smoke archive passed its recursive checksums, source-run and
+release validators, all 22 bundled tests, exact-cost links, common-randomness
+invariants, and independent recomputation. Its Git provenance recorded an
+untracked `Paper/__pycache__/`; the next patch adds root ignore rules and the
+full driver requires a clean committed worktree. The smoke configuration is
+only an execution gate; its metrics are not evidence.
+
+## Step 5 — pre-specified multi-task publication driver
+
+Status: **implemented and locally test-validated; owner multi-task smoke gate
+required before the full experiment.**
+
+Implemented:
+
+- immutable full and smoke analysis plans with task families, seeds, primary
+  comparison, independent unit, budget weighting, confidence level, bootstrap
+  count, and exact-test direction declared before execution;
+- a publication design gate requiring two task families, five independent
+  seeds per task, all three scaling policies, exact-cost comparators, three
+  adaptation replicates, exhaustive modular evaluation, 4,096 permutation
+  maxima, and 2,000 null-edge uncertainty resamples;
+- a clean-Git requirement and root cache/build ignore rules;
+- deterministic generated configs bound to the plan version, plan SHA-256, and
+  release identifier;
+- exact source-run enumeration, per-run validation, duplicate task/seed
+  rejection, and validator-gated resumption;
+- task-stratified run-cluster inference after averaging adaptation replicates
+  and pre-specified budgets within each independent run, followed by equal
+  weighting of the two pre-specified task-family means;
+- a confirmatory omnibus `primary_analysis.csv`, released underlying
+  `primary_run_deltas.csv`, and task-specific secondary
+  `primary_analysis_by_task.csv`;
+- a within-task cluster bootstrap and exact task-stratified sign-flip test over
+  all ten task/seed runs, with pre-specified alpha 0.05 and all 1,024 sign
+  patterns enumerated, avoiding the `p >= 0.0625` resolution floor of a
+  separate two-sided five-run test;
+- independent reconstruction of confirmatory run deltas from each released raw
+  exact-cost budget table before any primary statistic is accepted;
+- versioned aggregate/release schemas and manifests bound to the copied
+  analysis-plan SHA-256; and
+- complete driver/script/config inclusion in the immutable code snapshot.
+
+All 33 transformer tests and both plan-only validation gates pass locally. The
+two-task smoke release must now be generated on the owner machine and verified
+before launching the ten source-run publication experiment.

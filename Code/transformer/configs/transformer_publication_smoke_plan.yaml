@@ -1,0 +1,31 @@
+plan_version: transformer_publication_plan_v1
+release_kind: smoke
+release_prefix: transformer_design_smoke
+protocol_version: synthetic_transformer_publication_protocol_v4
+seeds: [321, 323]
+
+tasks:
+  - task_name: modular
+    config: configs/smoke_rank_scaling.yaml
+  - task_name: associative_recall
+    config: configs/smoke_publication_associative_recall.yaml
+
+analysis:
+  primary_scope: task_stratified_omnibus
+  task_weighting: equal_weight_across_task_families
+  generalization_scope: conditional_on_prespecified_task_families
+  secondary_task_specific: true
+  primary_scaling_mode: fixed_update_scale
+  primary_allocation_rule: soft_dimension
+  primary_reference_rule: uniform_exact_cost
+  primary_metric: final_val_loss
+  independent_unit: task_seed_run
+  primary_estimand: >-
+    Pipeline-only task-stratified omnibus version of the publication estimand;
+    smoke numerical values are not scientific evidence.
+  budget_weighting: equal_weight_within_run
+  scaling_conditions_analyzed_separately: true
+  two_sided_alpha: 0.05
+  confidence: 0.95
+  cluster_bootstrap_resamples: 10000
+  exact_sign_flip_test: two_sided_task_stratified
