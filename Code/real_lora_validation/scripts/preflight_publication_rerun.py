@@ -29,6 +29,7 @@ EXPECTED = {
     "numpy": "1.26.4", "transformers": "5.12.0", "datasets": "5.0.0",
     "accelerate": "1.14.0", "peft": "0.19.1", "safetensors": "0.8.0",
     "tokenizers": "0.22.2",
+    "scipy": "1.17.1",
 }
 
 

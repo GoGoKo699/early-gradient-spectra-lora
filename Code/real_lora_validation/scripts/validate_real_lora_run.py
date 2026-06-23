@@ -170,12 +170,34 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
         config.get("allocation_protocol_version") == ALLOCATION_PROTOCOL_VERSION,
         "allocation protocol mismatch",
     )
+    run_kind = str(config.get("run_kind", ""))
     if expected_kind is not None:
-        require(config.get("run_kind") == expected_kind, "run kind mismatch")
+        require(run_kind == expected_kind, "run kind mismatch")
+    if run_kind in {"smoke", "publication"}:
+        source_commit = str(config.get("source_git_commit", ""))
+        require(
+            len(source_commit) == 40
+            and all(ch in "0123456789abcdef" for ch in source_commit),
+            "controlled run lacks a valid source Git commit",
+        )
+        require(
+            str(config.get("source_git_status_porcelain", "")) == "",
+            "controlled run source Git worktree was not clean",
+        )
     require(config.get("calibration_model_mode") == "eval_with_gradients", "calibration was not eval-mode")
     require(bool(config.get("matched_strategy_batch_order")), "batch-order CRN flag is false")
     require(bool(config.get("nested_adapter_initialization")), "nested-init flag is false")
     require(bool(config.get("exact_parameter_cost")), "exact-cost flag is false")
+
+    provenance = read_json(run_dir / "input_provenance.json")
+    require(isinstance(provenance, dict), "input provenance must be a JSON object")
+    recorded_provenance_hash = provenance.get("provenance_sha256")
+    unhashed_provenance = dict(provenance)
+    unhashed_provenance.pop("provenance_sha256", None)
+    require(
+        recorded_provenance_hash == canonical_json_sha256(unhashed_provenance),
+        "input provenance self-hash mismatch",
+    )
 
     seeds = read_json(run_dir / "seed_manifest.json")
     expected_seeds = seed_manifest(int(config["seed"]))
@@ -186,6 +208,20 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
     )
 
     bank = load_bank(run_dir / "adapter_init_bank.pt")
+    requested_suffixes = [
+        part.strip()
+        for part in str(config.get("target_suffixes", "")).split(",")
+        if part.strip()
+    ]
+    require(requested_suffixes, "target_suffixes is empty")
+    for module_name in bank:
+        require(
+            any(module_name.endswith(suffix) for suffix in requested_suffixes),
+            f"target module {module_name!r} does not match requested suffixes",
+        )
+    max_targets = int(config.get("max_targets", 0))
+    if max_targets > 0:
+        require(len(bank) <= max_targets, "target count exceeds max_targets")
     init_manifest = read_json(run_dir / "adapter_init_manifest.json")
     require(
         init_manifest.get("protocol_version") == ADAPTER_INIT_PROTOCOL_VERSION,

@@ -72,6 +72,45 @@ except Exception:  # pragma: no cover - only used when datasets is unavailable.
     load_dataset = None
 
 
+SOURCE_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = SOURCE_ROOT.parents[1]
+
+
+def portable_path(value: str | Path) -> str:
+    """Render existing protocol inputs relative to the protocol root when possible."""
+    path = Path(value).expanduser()
+    if not path.exists():
+        return str(value)
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(SOURCE_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def command_output(command: list[str], cwd: Path) -> str | None:
+    try:
+        return subprocess.run(
+            command,
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def source_git_provenance() -> dict[str, str | None]:
+    """Bind a controlled run to the exact Git revision that generated it."""
+    return {
+        "source_git_commit": command_output(["git", "rev-parse", "HEAD"], PROJECT_ROOT),
+        "source_git_status_porcelain": command_output(
+            ["git", "status", "--porcelain"], PROJECT_ROOT
+        ),
+    }
+
+
 BUILTIN_TEXT = """
 Low-rank adaptation changes a pretrained model through a small number of trainable
 matrix directions. A layer with a large gradient norm may want to change, but the
@@ -297,6 +336,7 @@ def environment_record(device: torch.device) -> dict[str, Any]:
         "tokenizers",
         "safetensors",
         "huggingface_hub",
+        "scipy",
     ]
     return {
         "python": platform.python_version(),
@@ -1439,7 +1479,7 @@ def write_run_checksums(run_dir: Path) -> None:
 
 def local_input_provenance(args: argparse.Namespace) -> dict[str, Any]:
     provenance: dict[str, Any] = {
-        "model_argument": args.model,
+        "model_argument": portable_path(args.model),
         "model_revision_requested": args.model_revision,
         "dataset_mode": args.dataset_mode,
         "dataset_name": args.dataset_name,
@@ -1449,7 +1489,7 @@ def local_input_provenance(args: argparse.Namespace) -> dict[str, Any]:
     model_path = Path(args.model).expanduser()
     if model_path.exists():
         model_path = model_path.resolve()
-        provenance["local_model_path"] = str(model_path)
+        provenance["local_model_path"] = portable_path(model_path)
         if model_path.is_file():
             provenance["local_model_files"] = [
                 {
@@ -1459,18 +1499,23 @@ def local_input_provenance(args: argparse.Namespace) -> dict[str, Any]:
                 }
             ]
         else:
-            provenance["local_model_files"] = [
-                {
-                    "path": value.relative_to(model_path).as_posix(),
-                    "size": value.stat().st_size,
-                    "sha256": sha256_file(value),
-                }
-                for value in sorted(item for item in model_path.rglob("*") if item.is_file())
-            ]
+            model_files = []
+            for value in sorted(item for item in model_path.rglob("*") if item.is_file()):
+                relative = value.relative_to(model_path)
+                if any(part.startswith(".") for part in relative.parts):
+                    continue
+                model_files.append(
+                    {
+                        "path": relative.as_posix(),
+                        "size": value.stat().st_size,
+                        "sha256": sha256_file(value),
+                    }
+                )
+            provenance["local_model_files"] = model_files
     if args.dataset_mode == "local":
         provenance["local_text_files"] = {
             key: {
-                "path": str(Path(path).expanduser().resolve()),
+                "path": portable_path(Path(path).expanduser().resolve()),
                 "size": Path(path).expanduser().resolve().stat().st_size,
                 "sha256": sha256_file(Path(path).expanduser().resolve()),
             }
@@ -1568,6 +1613,26 @@ def parse_args() -> argparse.Namespace:
         choices=["exploratory", "smoke", "publication"],
         default="exploratory",
     )
+    parser.add_argument(
+        "--publication_plan_version",
+        "--publication-plan-version",
+        dest="publication_plan_version",
+        default=None,
+    )
+    parser.add_argument(
+        "--publication_plan_sha256",
+        "--publication-plan-sha256",
+        dest="publication_plan_sha256",
+        default=None,
+    )
+    parser.add_argument(
+        "--publication_release_id",
+        "--publication-release-id",
+        dest="publication_release_id",
+        default=None,
+    )
+    parser.add_argument("--suite_id", "--suite-id", dest="suite_id", default=None)
+    parser.add_argument("--suite_role", "--suite-role", dest="suite_role", default=None)
     parser.add_argument("--trust_remote_code", action="store_true")
     parser.add_argument("--calibrate_only", action="store_true")
     return parser.parse_args()
@@ -1606,6 +1671,29 @@ def validate_args(args: argparse.Namespace) -> list[str]:
         value = float(getattr(args, name))
         if value < 0 or not math.isfinite(value):
             raise ValueError(f"{name} must be finite and nonnegative")
+    binding_values = [
+        args.publication_plan_version,
+        args.publication_plan_sha256,
+        args.publication_release_id,
+        args.suite_id,
+        args.suite_role,
+    ]
+    if any(value is not None for value in binding_values) and not all(
+        isinstance(value, str) and value.strip() for value in binding_values
+    ):
+        raise ValueError(
+            "publication-plan binding fields must be supplied together and nonempty"
+        )
+    if args.publication_plan_sha256 is not None:
+        value = args.publication_plan_sha256
+        if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+            raise ValueError("publication_plan_sha256 must be a lowercase SHA-256")
+    for label in ["publication_release_id", "suite_id", "suite_role"]:
+        value = getattr(args, label)
+        if value is not None and any(
+            not (ch.isalnum() or ch in "._-") for ch in value
+        ):
+            raise ValueError(f"{label} contains unsupported characters")
     if args.run_kind == "publication":
         if args.dataset_mode != "local":
             raise ValueError("publication runs require --dataset_mode local")
@@ -1621,12 +1709,27 @@ def validate_args(args: argparse.Namespace) -> list[str]:
             raise ValueError("publication runs require --deterministic_algorithms")
         if not args.include_identity_control:
             raise ValueError("publication runs require --include_identity_control")
+        if not all(binding_values):
+            raise ValueError(
+                "publication runs require publication plan/release/suite binding fields"
+            )
     return strategies
 
 
 def main() -> None:
     args = parse_args()
     requested_strategies = validate_args(args)
+    git_provenance = source_git_provenance()
+    if args.run_kind in {"smoke", "publication"}:
+        if not git_provenance["source_git_commit"]:
+            raise RuntimeError("controlled smoke/publication runs require a Git commit")
+        if git_provenance["source_git_status_porcelain"] is None:
+            raise RuntimeError("could not determine source Git worktree status")
+        if git_provenance["source_git_status_porcelain"]:
+            raise RuntimeError(
+                "controlled smoke/publication runs require a clean worktree:\n"
+                f"{git_provenance['source_git_status_porcelain']}"
+            )
     determinism = configure_determinism(args.deterministic_algorithms)
     seeds = seed_manifest(args.seed)
     streams = {key: int(value) for key, value in seeds["streams"].items()}
@@ -1684,9 +1787,11 @@ def main() -> None:
 
     write_json(run_dir / "seed_manifest.json", seeds)
     write_json(run_dir / "environment.json", environment_record(device))
-    write_json(run_dir / "input_provenance.json", local_input_provenance(args))
 
     config: dict[str, Any] = vars(args).copy()
+    for field in ["model", "train_text_file", "val_text_file", "out_dir"]:
+        if config.get(field):
+            config[field] = portable_path(config[field])
     config.update(
         {
             "schema_version": RUN_MANIFEST_VERSION,
@@ -1696,7 +1801,7 @@ def main() -> None:
             "adapter_state_protocol_version": ADAPTER_STATE_PROTOCOL_VERSION,
             "allocation_protocol_version": ALLOCATION_PROTOCOL_VERSION,
             "run_id": run_id,
-            "run_dir": str(run_dir),
+            "run_dir": portable_path(run_dir),
             "status": "initializing",
             "requested_strategies": requested_strategies,
             "train_blocks": int(train_blocks.shape[0]),
@@ -1710,6 +1815,7 @@ def main() -> None:
             "exact_parameter_cost": True,
             "determinism": determinism,
             "seed_manifest_sha256": canonical_json_sha256(seeds),
+            **git_provenance,
         }
     )
     write_json(run_dir / "config.json", config)
@@ -1725,6 +1831,11 @@ def main() -> None:
         local_files_only=args.local_files_only,
     )
     resolved_commit = getattr(getattr(base, "config", None), "_commit_hash", None)
+    input_provenance = local_input_provenance(args)
+    input_provenance["resolved_model_commit"] = resolved_commit
+    input_provenance.pop("provenance_sha256", None)
+    input_provenance["provenance_sha256"] = canonical_json_sha256(input_provenance)
+    write_json(run_dir / "input_provenance.json", input_provenance)
     targets = find_targets(
         base,
         suffixes=suffixes,

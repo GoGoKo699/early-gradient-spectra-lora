@@ -22,3 +22,5 @@ __pycache__/
 /Code/real_lora_validation/real_lora_runs/
 /Code/real_lora_validation/runs/
 /Code/real_lora_validation/requirements-local-freeze.txt
+/Code/real_lora_validation/models/
+/Code/real_lora_validation/data/

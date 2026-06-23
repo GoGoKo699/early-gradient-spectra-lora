@@ -19,3 +19,4 @@ pyarrow>=15
 scikit-learn>=1.4
 evaluate>=0.4
 tqdm>=4.66
+scipy==1.17.1

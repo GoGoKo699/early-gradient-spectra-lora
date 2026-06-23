@@ -12,6 +12,7 @@ tokenizers==0.22.2
 pyarrow
 pandas
 scikit-learn
+scipy==1.17.1
 evaluate
 tqdm
 # Direct dependencies of the publication input/rerun helpers.

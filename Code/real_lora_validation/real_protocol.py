@@ -21,6 +21,9 @@ ALLOCATION_PROTOCOL_VERSION = "exact_parameter_cost_dp_v1"
 ADAPTER_STATE_PROTOCOL_VERSION = "real_lora_adapter_state_v1"
 RUN_MANIFEST_VERSION = "real_lora_run_manifest_v2"
 RELEASE_MANIFEST_VERSION = "real_lora_release_manifest_v2"
+PUBLICATION_PLAN_VERSION = "real_lora_publication_plan_v1"
+PUBLICATION_AGGREGATE_VERSION = "real_lora_publication_aggregate_v1"
+PUBLICATION_RELEASE_VERSION = "real_lora_publication_release_v1"
 
 STREAM_NAMES = (
     "model_load",

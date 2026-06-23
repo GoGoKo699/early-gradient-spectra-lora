@@ -174,13 +174,13 @@ Implemented:
 
 ## Remaining submission work after Step 7
 
-1. Complete or sharply narrow the real-model stochastic-control evidence.
-2. Update adaptive-rank baselines and related work.
+1. Complete the Step 10 real-model publication-driver smoke and frozen 11-run rerun.
+2. Import the corrected real-model result and finish related-work positioning.
 3. Perform final rendered-PDF, metadata, archive, and root-checksum preflight.
 
 ## Step 8 — controlled real-model protocol and adaptive allocation controls
 
-Status: **implemented and unit-validated; owner smoke release required.**
+Status: **owner smoke release verified; superseded by the Step 9 learning gate.**
 
 Implemented:
 
@@ -200,6 +200,51 @@ Implemented:
 - deterministic portable release archives and SHA-256 sidecars; and
 - 20 passing real-model protocol unit tests.
 
-The protocol smoke is an execution and invariance gate only. No real-model
-numerical claim should be updated until the smoke archive is independently
-verified and the pre-specified multi-seed publication driver is run.
+The owner smoke archive passed recursive checksum, source-run, and release
+validation. It remains non-evidential: the Step 8 result schema did not preserve
+first-step LoRA gradients or final adapter tensors, so identical printed losses
+could not prove that the adapters had moved. Step 9 closes that instrumentation
+gap before any long rerun.
+
+## Step 9 — active-adapter gate
+
+Status: **completed; owner activity-gated smoke release independently verified.**
+
+Implemented and verified:
+
+- first-step full-adapter and LoRA-B gradient norms for every strategy;
+- saved final adapter-state artifacts and serialization-independent tensor hashes;
+- independent reconstruction of the nested zero-B initial state;
+- exact recomputation of parameter movement and the effective low-rank update;
+- hard rejection of any inactive adapter or identical allocation that diverges
+  in training trace, final state, or evaluation result; and
+- positive gradients, parameter movement, and effective updates for all seven
+  strategies in the owner smoke archive.
+
+## Step 10 — frozen real-model publication driver
+
+Status: **implemented and locally validated; owner four-source driver smoke
+release required.**
+
+Implemented:
+
+- committed, checksum-bound four-source publication-driver smoke and 8+3 full
+  analysis plans;
+- eight primary GPT-2/WikiText-2 runs, allowing an exact two-sided sign-flip
+  p-value below 0.05 even with up to two exact ties, plus a separate three-run
+  descriptive attention-output-projection boundary suite;
+- allocation-only gradient-norm, EVA-style, FIM-style, and GoRA-style secondary
+  controls under exact parameter-cost matching;
+- deterministic bootstrap seeds derived only from the committed plan hash;
+- exact sign-flip inference on nonzero paired differences, t and bootstrap
+  intervals, attainable p-value reporting, and within-suite Holm adjustment;
+- immutable SHA-256-bound GPT-2 and WikiText-2 input specifications;
+- a resumable offline child-process driver that strips proxy variables only in
+  child processes and never changes the parent shell or VPN configuration;
+- quarantine of invalid partial source runs before safe regeneration; and
+- multi-source release construction with independent semantic recomputation of
+  source bindings, raw aggregate tables, paired effects, inference, Git/input
+  provenance, and exact checksum coverage.
+
+The long 11-run experiment remains blocked until the four-source Step 10 smoke
+archive passes independent verification.

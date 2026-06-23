@@ -82,6 +82,74 @@ cd Code/real_lora_validation
 python -m pytest -q
 ```
 
+## Frozen multi-source publication driver
+
+The publication driver binds every source run to a committed JSON plan, runs all
+model work offline, aggregates only at the independent suite-seed-run level, and
+builds one checksum-complete portable release. Proxy variables are removed only
+from child processes. The invoking shell and VPN configuration are never
+modified.
+
+Validate the two committed plans before using GPU time:
+
+```bash
+python scripts/run_real_lora_publication.py \
+  --plan configs/real_lora_publication_smoke_plan.json \
+  --validate-plan-only
+
+python scripts/run_real_lora_publication.py \
+  --plan configs/real_lora_publication_plan.json \
+  --validate-plan-only
+```
+
+The smoke plan contains four independent tiny-GPT-2 source runs (two seeds in
+both the core and attention-output-projection suites) and is execution-only.
+Run it with:
+
+```bash
+bash scripts/run_real_lora_publication_smoke.sh 2>&1 \
+  | tee real_lora_publication_smoke.log
+```
+
+The frozen publication plan contains 11 source runs:
+
+- eight primary `c_attn,c_fc` runs at seeds 101, 103, 107, 109, 113, 127,
+  131, and 137;
+- three attention-output-projection boundary runs at seeds 101, 103, and 107.
+
+The primary estimand is the paired final-validation-loss difference,
+`spectral_effective - uniform_r4`, across the eight primary runs. Eight primary
+units are required because a two-sided exact sign-flip test with five units
+cannot attain a p-value below 0.05. The boundary suite is descriptive and is
+never pooled with the primary suite. Secondary allocation controls are adjusted
+with Holm's procedure within each suite.
+
+The long run is launched only after the publication-driver smoke release has
+been independently validated:
+
+```bash
+RID="real_lora_publication_$(date -u +%Y%m%dT%H%M%SZ)"
+printf '%s\n' "$RID" > "$HOME/real_lora_publication_active_id.txt"
+
+bash scripts/run_real_lora_publication.sh \
+  --release-id "$RID" 2>&1 \
+  | tee "$HOME/${RID}.log"
+```
+
+Resume with the same release ID:
+
+```bash
+RID=$(cat "$HOME/real_lora_publication_active_id.txt")
+bash scripts/run_real_lora_publication.sh \
+  --release-id "$RID" --resume 2>&1 \
+  | tee -a "$HOME/${RID}.log"
+```
+
+A valid release ends with `Real LoRA publication driver: PASS` and includes the
+raw source runs, saved final adapter states, the frozen plan, independent
+statistics, exact checksum coverage, code snapshot, environment record, and a
+`.tar.gz.sha256` sidecar.
+
 ## Publication-protocol smoke release
 
 ```bash
@@ -133,40 +201,15 @@ PYTHONDONTWRITEBYTECODE=1 python -B scripts/validate_real_lora_release.py \
 )
 ```
 
-## Publication-run requirements
+## Single-source publication gates
 
 Passing `--run_kind publication` activates hard input and protocol gates. A
-publication run must use:
-
-- a local pinned model path;
-- local train and validation text files;
-- `--local_files_only`;
-- `--deterministic_algorithms`; and
-- `--include_identity_control`.
-
-Example shape only—the full multi-seed publication driver is maintained
-separately from this single-source-run command:
-
-```bash
-python run_real_lora_validation.py \
-  --run-id real_gpt2_seed101 \
-  --run-kind publication \
-  --model models/gpt2_local \
-  --local_files_only \
-  --dataset_mode local \
-  --train_text_file data/wikitext2_local/train.txt \
-  --val_text_file data/wikitext2_local/validation.txt \
-  --seed 101 \
-  --uniform_rank 4 \
-  --min_rank 1 \
-  --max_rank 16 \
-  --strategies uniform,gradient_norm,spectral_effective,eva_activation,fim_gradient_variance,gora_sensitivity \
-  --include_identity_control \
-  --deterministic_algorithms \
-  --out_dir runs/real_lora_source_runs
-```
-
-Do not treat a single source run as an independent multi-seed result.
+publication source run must use a pinned local model, local train and validation
+text, offline loading, deterministic algorithms, the duplicate-uniform control,
+and complete plan/release/suite bindings. Source runs should normally be created
+only by `scripts/run_real_lora_publication.py`; direct invocation is retained for
+diagnostics and validator development. A single source run is never treated as
+independent multi-seed evidence.
 
 ## Legacy commands
 

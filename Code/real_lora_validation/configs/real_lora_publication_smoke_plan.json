@@ -1,0 +1,90 @@
+{
+  "plan_version": "real_lora_publication_plan_v1",
+  "release_kind": "smoke",
+  "release_prefix": "real_lora_design_smoke",
+  "protocol_version": "real_lora_publication_protocol_v3",
+  "model": {
+    "argument": "sshleifer/tiny-gpt2",
+    "local_files_only": true
+  },
+  "dataset": {
+    "mode": "builtin"
+  },
+  "suites": [
+    {
+      "suite_id": "tiny_core",
+      "role": "pipeline_primary",
+      "seeds": [
+        321,
+        323
+      ],
+      "target_suffixes": "c_attn,c_fc",
+      "max_targets": 4
+    },
+    {
+      "suite_id": "tiny_attnproj",
+      "role": "pipeline_boundary",
+      "seeds": [
+        321,
+        323
+      ],
+      "target_suffixes": "c_attn,attn.c_proj,c_fc",
+      "max_targets": 4
+    }
+  ],
+  "run": {
+    "block_size": 32,
+    "batch_size": 2,
+    "calib_batches": 2,
+    "eval_batches": 2,
+    "steps": 4,
+    "lr": 0.0002,
+    "weight_decay": 0.0,
+    "grad_clip": 1.0,
+    "uniform_rank": 2,
+    "min_rank": 1,
+    "max_rank": 3,
+    "fisher_reference_rank": 2,
+    "ridge_scale": 0.001,
+    "lora_alpha_scale": 2.0,
+    "lora_init_std": 0.01,
+    "max_train_texts": 32,
+    "max_val_texts": 16,
+    "max_train_blocks": 16,
+    "max_val_blocks": 8,
+    "dtype": "float32",
+    "device": "cuda",
+    "log_every": 1,
+    "strategies": [
+      "uniform",
+      "gradient_norm",
+      "spectral_effective",
+      "eva_activation",
+      "fim_gradient_variance",
+      "gora_sensitivity"
+    ],
+    "include_identity_control": true,
+    "identity_tolerance": 1e-07,
+    "minimum_first_step_gradient_l2": 0.0,
+    "minimum_adapter_delta_l2": 0.0,
+    "minimum_effective_update_l2": 0.0,
+    "deterministic_algorithms": true
+  },
+  "analysis": {
+    "primary_suite": "tiny_core",
+    "primary_metric": "final_val_loss",
+    "primary_candidate_strategy": "spectral_effective",
+    "primary_reference_requested_strategy": "uniform",
+    "independent_unit": "suite_seed_run",
+    "delta_definition": "candidate_minus_reference",
+    "lower_is_better": true,
+    "primary_estimand": "Pipeline-only four-source-run version of the frozen paired estimand. Smoke numerical values are not scientific evidence.",
+    "confidence": 0.95,
+    "two_sided_alpha": 0.05,
+    "bootstrap_resamples": 10000,
+    "exact_sign_flip_test": "two_sided_within_suite_nonzero_deltas",
+    "secondary_multiplicity": "holm_within_suite",
+    "minimum_nonzero_primary_deltas_for_resolution": 1,
+    "planned_tie_tolerance": 1
+  }
+}
