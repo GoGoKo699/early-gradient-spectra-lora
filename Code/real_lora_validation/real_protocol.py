@@ -12,14 +12,15 @@ from typing import Mapping, Sequence
 import numpy as np
 import torch
 
-REAL_PROTOCOL_VERSION = "real_lora_publication_protocol_v2"
+REAL_PROTOCOL_VERSION = "real_lora_publication_protocol_v3"
 RNG_PROTOCOL_VERSION = "named_sha256_streams_v1"
 ADAPTER_INIT_PROTOCOL_VERSION = "nested_max_rank_lora_a_v1"
 # Backward-compatible alias for any local notebooks created during development.
 INIT_PROTOCOL_VERSION = ADAPTER_INIT_PROTOCOL_VERSION
 ALLOCATION_PROTOCOL_VERSION = "exact_parameter_cost_dp_v1"
-RUN_MANIFEST_VERSION = "real_lora_run_manifest_v1"
-RELEASE_MANIFEST_VERSION = "real_lora_release_manifest_v1"
+ADAPTER_STATE_PROTOCOL_VERSION = "real_lora_adapter_state_v1"
+RUN_MANIFEST_VERSION = "real_lora_run_manifest_v2"
+RELEASE_MANIFEST_VERSION = "real_lora_release_manifest_v2"
 
 STREAM_NAMES = (
     "model_load",
@@ -94,6 +95,129 @@ def tensor_sha256(tensor: torch.Tensor) -> str:
     digest.update(b"\0")
     digest.update(value.numpy().tobytes(order="C"))
     return digest.hexdigest()
+
+
+def tensor_mapping_sha256(values: Mapping[str, torch.Tensor]) -> str:
+    """Hash a named tensor mapping independently of serialization format."""
+    digest = hashlib.sha256()
+    for name in sorted(values):
+        tensor = values[name]
+        if not isinstance(tensor, torch.Tensor):
+            raise TypeError(f"tensor mapping value for {name!r} is not a tensor")
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(tensor_sha256(tensor).encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def build_initial_adapter_state(
+    *,
+    ranks: Mapping[str, int],
+    bank: Mapping[str, torch.Tensor],
+    module_classes: Mapping[str, str],
+    output_dims: Mapping[str, int],
+) -> dict[str, torch.Tensor]:
+    """Reconstruct the exact zero-B adapter state used before optimization."""
+    names = sorted(ranks)
+    if set(names) != set(module_classes) or set(names) != set(output_dims):
+        raise ValueError("rank, class and output-dimension keys must match")
+    state: dict[str, torch.Tensor] = {}
+    for name in names:
+        rank = int(ranks[name])
+        canonical_a = bank_slice(bank, name, rank).to(dtype=torch.float32)
+        out_dim = int(output_dims[name])
+        if out_dim < 1:
+            raise ValueError(f"output dimension for {name} must be >= 1")
+        module_class = str(module_classes[name])
+        if module_class == "Linear":
+            state[f"{name}.lora_A"] = canonical_a.clone()
+            state[f"{name}.lora_B"] = torch.zeros(
+                (out_dim, rank), dtype=torch.float32
+            )
+        elif module_class == "Conv1D":
+            state[f"{name}.lora_A"] = canonical_a.t().contiguous()
+            state[f"{name}.lora_B"] = torch.zeros(
+                (rank, out_dim), dtype=torch.float32
+            )
+        else:
+            raise ValueError(f"unsupported adapter module class {module_class!r}")
+    return state
+
+
+def adapter_activity_metrics(
+    *,
+    initial_state: Mapping[str, torch.Tensor],
+    final_state: Mapping[str, torch.Tensor],
+    module_classes: Mapping[str, str],
+    alpha_scale: float,
+) -> dict[str, object]:
+    """Compute auditable adapter movement and effective-update diagnostics."""
+    if set(initial_state) != set(final_state):
+        raise ValueError("initial and final adapter state keys must match")
+    if not math.isfinite(float(alpha_scale)):
+        raise ValueError("alpha_scale must be finite")
+
+    total_sq = 0.0
+    a_sq = 0.0
+    b_sq = 0.0
+    changed = 0
+    parameter_count = 0
+    for name in sorted(initial_state):
+        initial = initial_state[name].detach().to(device="cpu", dtype=torch.float64)
+        final = final_state[name].detach().to(device="cpu", dtype=torch.float64)
+        if initial.shape != final.shape:
+            raise ValueError(f"adapter state shape mismatch for {name}")
+        delta = final - initial
+        value = float(delta.square().sum().item())
+        total_sq += value
+        if name.endswith(".lora_A"):
+            a_sq += value
+        elif name.endswith(".lora_B"):
+            b_sq += value
+        else:
+            raise ValueError(f"unexpected adapter parameter name {name!r}")
+        changed += int(torch.count_nonzero(delta).item())
+        parameter_count += int(final.numel())
+
+    effective_sq = 0.0
+    per_module: list[dict[str, object]] = []
+    for module in sorted(module_classes):
+        a_name = f"{module}.lora_A"
+        b_name = f"{module}.lora_B"
+        if a_name not in final_state or b_name not in final_state:
+            raise ValueError(f"adapter state is missing tensors for {module}")
+        a = final_state[a_name].detach().to(device="cpu", dtype=torch.float64)
+        b = final_state[b_name].detach().to(device="cpu", dtype=torch.float64)
+        module_class = str(module_classes[module])
+        if module_class == "Linear":
+            update = b @ a
+        elif module_class == "Conv1D":
+            update = a @ b
+        else:
+            raise ValueError(f"unsupported adapter module class {module_class!r}")
+        update = update * float(alpha_scale)
+        frobenius = float(torch.linalg.norm(update).item())
+        effective_sq += frobenius * frobenius
+        per_module.append(
+            {
+                "module": module,
+                "module_class": module_class,
+                "effective_update_frobenius": frobenius,
+            }
+        )
+
+    return {
+        "initial_adapter_state_sha256": tensor_mapping_sha256(initial_state),
+        "final_adapter_state_sha256": tensor_mapping_sha256(final_state),
+        "adapter_parameter_count": parameter_count,
+        "changed_parameter_count": changed,
+        "adapter_parameter_delta_l2": math.sqrt(total_sq),
+        "lora_a_parameter_delta_l2": math.sqrt(a_sq),
+        "lora_b_parameter_delta_l2": math.sqrt(b_sq),
+        "effective_update_frobenius_l2": math.sqrt(effective_sq),
+        "per_module": per_module,
+    }
 
 
 def build_nested_init_bank(

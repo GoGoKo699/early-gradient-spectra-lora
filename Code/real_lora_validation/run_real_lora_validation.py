@@ -40,10 +40,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from real_protocol import (
     ADAPTER_INIT_PROTOCOL_VERSION,
+    ADAPTER_STATE_PROTOCOL_VERSION,
     ALLOCATION_PROTOCOL_VERSION,
     REAL_PROTOCOL_VERSION,
     RNG_PROTOCOL_VERSION,
     RUN_MANIFEST_VERSION,
+    adapter_activity_metrics,
     allocate_exact_budget,
     assignment_sha256,
     bank_slice,
@@ -55,6 +57,7 @@ from real_protocol import (
     seed_manifest,
     set_global_seed,
     sha256_file,
+    tensor_mapping_sha256,
     tensor_sha256,
 )
 from spectral_metrics import (
@@ -976,12 +979,42 @@ def apply_lora(
         set_submodule(model, name, wrapped)
 
 
-def adapter_parameters(model: nn.Module) -> list[nn.Parameter]:
-    return [
-        parameter
+def named_adapter_parameters(model: nn.Module) -> dict[str, nn.Parameter]:
+    return {
+        name: parameter
         for name, parameter in model.named_parameters()
-        if ("lora_A" in name or "lora_B" in name) and parameter.requires_grad
-    ]
+        if (name.endswith(".lora_A") or name.endswith(".lora_B"))
+        and parameter.requires_grad
+    }
+
+
+def adapter_parameters(model: nn.Module) -> list[nn.Parameter]:
+    """Backward-compatible list view used by older local notebooks."""
+    return list(named_adapter_parameters(model).values())
+
+
+def clone_adapter_state(model: nn.Module) -> dict[str, torch.Tensor]:
+    return {
+        name: parameter.detach().to(device="cpu", dtype=torch.float32).clone()
+        for name, parameter in named_adapter_parameters(model).items()
+    }
+
+
+def gradient_l2(
+    parameters: Mapping[str, nn.Parameter], *, suffix: str | None = None
+) -> float:
+    total = 0.0
+    found = False
+    for name, parameter in parameters.items():
+        if suffix is not None and not name.endswith(suffix):
+            continue
+        gradient = parameter.grad
+        if gradient is None:
+            continue
+        found = True
+        value = gradient.detach().to(device="cpu", dtype=torch.float64)
+        total += float(value.square().sum().item())
+    return math.sqrt(total) if found else 0.0
 
 
 @torch.no_grad()
@@ -1039,9 +1072,12 @@ def train_strategy(
         alpha_scale=args.lora_alpha_scale,
         init_bank=init_bank,
     )
-    parameters = adapter_parameters(model)
-    if not parameters:
+    named_parameters = named_adapter_parameters(model)
+    if not named_parameters:
         raise RuntimeError("no adapter parameters found")
+    parameters = list(named_parameters.values())
+    initial_state = clone_adapter_state(model)
+    initial_state_hash = tensor_mapping_sha256(initial_state)
     optimizer = torch.optim.AdamW(
         parameters, lr=args.lr, weight_decay=args.weight_decay
     )
@@ -1059,6 +1095,8 @@ def train_strategy(
     stream = infinite_loader(train_loader)
     history_path = run_dir / f"train_history_{strategy_name}.csv"
     train_losses: list[float] = []
+    first_step_adapter_gradient_l2: float | None = None
+    first_step_lora_b_gradient_l2: float | None = None
     with history_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle, fieldnames=["step", "train_loss", "elapsed_sec"]
@@ -1075,6 +1113,11 @@ def train_strategy(
                     f"non-finite training loss for {strategy_name} at step {step}"
                 )
             loss.backward()
+            if step == 1:
+                first_step_adapter_gradient_l2 = gradient_l2(named_parameters)
+                first_step_lora_b_gradient_l2 = gradient_l2(
+                    named_parameters, suffix=".lora_B"
+                )
             if args.grad_clip > 0:
                 torch.nn.utils.clip_grad_norm_(parameters, args.grad_clip)
             optimizer.step()
@@ -1095,13 +1138,89 @@ def train_strategy(
                     flush=True,
                 )
 
+    if first_step_adapter_gradient_l2 is None or first_step_lora_b_gradient_l2 is None:
+        raise RuntimeError("first-step adapter gradients were not recorded")
+
+    final_state = clone_adapter_state(model)
+    module_classes: dict[str, str] = {}
+    for module_name in ranks:
+        wrapped = get_submodule(model, module_name)
+        if isinstance(wrapped, LoRALinear):
+            module_classes[module_name] = "Linear"
+        elif isinstance(wrapped, LoRAConv1D):
+            module_classes[module_name] = "Conv1D"
+        else:  # pragma: no cover - apply_lora guarantees this.
+            raise TypeError(f"unexpected wrapped adapter module {type(wrapped)}")
+    activity = adapter_activity_metrics(
+        initial_state=initial_state,
+        final_state=final_state,
+        module_classes=module_classes,
+        alpha_scale=args.lora_alpha_scale,
+    )
+    if activity["initial_adapter_state_sha256"] != initial_state_hash:
+        raise AssertionError("initial adapter state hash changed during diagnostics")
+
+    activity_failures: list[str] = []
+    threshold_checks = [
+        (
+            "first_step_adapter_gradient_l2",
+            first_step_adapter_gradient_l2,
+            args.minimum_first_step_gradient_l2,
+        ),
+        (
+            "first_step_lora_b_gradient_l2",
+            first_step_lora_b_gradient_l2,
+            args.minimum_first_step_gradient_l2,
+        ),
+        (
+            "adapter_parameter_delta_l2",
+            float(activity["adapter_parameter_delta_l2"]),
+            args.minimum_adapter_delta_l2,
+        ),
+        (
+            "lora_b_parameter_delta_l2",
+            float(activity["lora_b_parameter_delta_l2"]),
+            args.minimum_adapter_delta_l2,
+        ),
+        (
+            "effective_update_frobenius_l2",
+            float(activity["effective_update_frobenius_l2"]),
+            args.minimum_effective_update_l2,
+        ),
+    ]
+    for label, value, threshold in threshold_checks:
+        if not math.isfinite(float(value)) or float(value) <= float(threshold):
+            activity_failures.append(
+                f"{label}={value} is not greater than threshold={threshold}"
+            )
+    if int(activity["changed_parameter_count"]) <= 0:
+        activity_failures.append("changed_parameter_count is zero")
+    if activity_failures:
+        raise RuntimeError(
+            f"inactive LoRA adapter detected for {strategy_name}: "
+            + "; ".join(activity_failures)
+        )
+
+    assignment_hash = assignment_sha256(ranks, init_bank)
+    state_filename = f"adapter_state_{strategy_name}.pt"
+    state_path = run_dir / state_filename
+    torch.save(
+        {
+            "schema_version": ADAPTER_STATE_PROTOCOL_VERSION,
+            "strategy": strategy_name,
+            "assignment_sha256": assignment_hash,
+            "alpha_scale": float(args.lora_alpha_scale),
+            "parameters": final_state,
+        },
+        state_path,
+    )
+
     set_global_seed(int(streams["evaluation"]))
     final_loss = evaluate(
         model, val_loader, device=device, eval_batches=args.eval_batches
     )
-    assignment_hash = assignment_sha256(ranks, init_bank)
 
-    del model, optimizer, parameters
+    del model, optimizer, parameters, named_parameters
     gc.collect()
     if torch.cuda.is_available() and device.type == "cuda":
         torch.cuda.empty_cache()
@@ -1120,7 +1239,25 @@ def train_strategy(
         "training_dropout_seed": int(streams["training_dropout"]),
         "evaluation_data_seed": int(streams["evaluation_data"]),
         "evaluation_seed": int(streams["evaluation"]),
+        "adapter_state_file": state_filename,
+        "adapter_state_file_sha256": sha256_file(state_path),
+        "initial_adapter_state_sha256": activity[
+            "initial_adapter_state_sha256"
+        ],
+        "final_adapter_state_sha256": activity["final_adapter_state_sha256"],
+        "adapter_parameter_count": activity["adapter_parameter_count"],
+        "changed_parameter_count": activity["changed_parameter_count"],
+        "first_step_adapter_gradient_l2": first_step_adapter_gradient_l2,
+        "first_step_lora_b_gradient_l2": first_step_lora_b_gradient_l2,
+        "adapter_parameter_delta_l2": activity["adapter_parameter_delta_l2"],
+        "lora_a_parameter_delta_l2": activity["lora_a_parameter_delta_l2"],
+        "lora_b_parameter_delta_l2": activity["lora_b_parameter_delta_l2"],
+        "effective_update_frobenius_l2": activity[
+            "effective_update_frobenius_l2"
+        ],
+        "adapter_activity_passed": True,
     }
+
 
 
 def assert_protocol_invariants(
@@ -1131,9 +1268,20 @@ def assert_protocol_invariants(
     target_budget: int,
     tolerance: float,
     require_identity_control: bool,
+    minimum_first_step_gradient_l2: float = 0.0,
+    minimum_adapter_delta_l2: float = 0.0,
+    minimum_effective_update_l2: float = 0.0,
 ) -> dict[str, Any]:
     if tolerance < 0 or not math.isfinite(tolerance):
         raise ValueError("identity tolerance must be finite and nonnegative")
+    thresholds = {
+        "minimum_first_step_gradient_l2": minimum_first_step_gradient_l2,
+        "minimum_adapter_delta_l2": minimum_adapter_delta_l2,
+        "minimum_effective_update_l2": minimum_effective_update_l2,
+    }
+    for label, value in thresholds.items():
+        if float(value) < 0 or not math.isfinite(float(value)):
+            raise ValueError(f"{label} must be finite and nonnegative")
     budget_rows = {
         strategy: total_lora_params(ranks, specs)
         for strategy, ranks in allocations.items()
@@ -1158,6 +1306,8 @@ def assert_protocol_invariants(
         "identity_control_present": "uniform_identity_control" in allocations,
         "identity_tolerance": float(tolerance),
         "identical_assignment_groups": [],
+        "adapter_activity_nonzero": None,
+        **{key: float(value) for key, value in thresholds.items()},
     }
     if require_identity_control and not checks["identity_control_present"]:
         raise RuntimeError("uniform identity control was requested but is absent")
@@ -1170,6 +1320,30 @@ def assert_protocol_invariants(
             "result strategies do not match allocations: "
             f"results={sorted(by_strategy)}, allocations={sorted(allocations)}"
         )
+
+    activity_fields = {
+        "first_step_adapter_gradient_l2": minimum_first_step_gradient_l2,
+        "first_step_lora_b_gradient_l2": minimum_first_step_gradient_l2,
+        "adapter_parameter_delta_l2": minimum_adapter_delta_l2,
+        "lora_b_parameter_delta_l2": minimum_adapter_delta_l2,
+        "effective_update_frobenius_l2": minimum_effective_update_l2,
+    }
+    for row in results:
+        strategy = str(row["strategy"])
+        if row.get("adapter_activity_passed") is not True:
+            raise RuntimeError(f"adapter activity flag is false for {strategy}")
+        if int(row.get("changed_parameter_count", 0)) <= 0:
+            raise RuntimeError(f"no adapter parameters changed for {strategy}")
+        for field, threshold in activity_fields.items():
+            value = float(row[field])
+            if not math.isfinite(value) or value <= float(threshold):
+                raise RuntimeError(
+                    f"inactive adapter diagnostic for {strategy}: "
+                    f"{field}={value}, threshold={threshold}"
+                )
+        if row["initial_adapter_state_sha256"] == row["final_adapter_state_sha256"]:
+            raise RuntimeError(f"adapter state hash did not change for {strategy}")
+    checks["adapter_activity_nonzero"] = True
 
     initial_values = [float(row["initial_val_loss"]) for row in results]
     initial_range = max(initial_values) - min(initial_values)
@@ -1201,6 +1375,14 @@ def assert_protocol_invariants(
                     "identical allocation produced different training traces: "
                     f"{strategy_names}"
                 )
+            if (
+                row["final_adapter_state_sha256"]
+                != reference["final_adapter_state_sha256"]
+            ):
+                raise RuntimeError(
+                    "identical allocation produced different final adapter states: "
+                    f"{strategy_names}"
+                )
         if maximum_difference > tolerance:
             raise RuntimeError(
                 "identical allocation produced different evaluation metrics: "
@@ -1213,6 +1395,9 @@ def assert_protocol_invariants(
                 "strategies": strategy_names,
                 "maximum_metric_difference": maximum_difference,
                 "trace_sha256": reference["train_trace_sha256"],
+                "final_adapter_state_sha256": reference[
+                    "final_adapter_state_sha256"
+                ],
             }
         )
     checks["identical_assignment_identity"] = True
@@ -1343,6 +1528,27 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--include_identity_control", "--include-identity-control", dest="include_identity_control", action="store_true")
     parser.add_argument("--identity_tolerance", "--identity-tolerance", dest="identity_tolerance", type=float, default=1e-7)
+    parser.add_argument(
+        "--minimum_first_step_gradient_l2",
+        "--minimum-first-step-gradient-l2",
+        dest="minimum_first_step_gradient_l2",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--minimum_adapter_delta_l2",
+        "--minimum-adapter-delta-l2",
+        dest="minimum_adapter_delta_l2",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--minimum_effective_update_l2",
+        "--minimum-effective-update-l2",
+        dest="minimum_effective_update_l2",
+        type=float,
+        default=0.0,
+    )
     parser.add_argument("--deterministic_algorithms", "--deterministic-algorithms", dest="deterministic_algorithms", action="store_true")
     parser.add_argument(
         "--dtype",
@@ -1392,6 +1598,14 @@ def validate_args(args: argparse.Namespace) -> list[str]:
             raise ValueError(f"{name} must be >= 1")
     if args.identity_tolerance < 0 or not math.isfinite(args.identity_tolerance):
         raise ValueError("identity_tolerance must be finite and nonnegative")
+    for name in [
+        "minimum_first_step_gradient_l2",
+        "minimum_adapter_delta_l2",
+        "minimum_effective_update_l2",
+    ]:
+        value = float(getattr(args, name))
+        if value < 0 or not math.isfinite(value):
+            raise ValueError(f"{name} must be finite and nonnegative")
     if args.run_kind == "publication":
         if args.dataset_mode != "local":
             raise ValueError("publication runs require --dataset_mode local")
@@ -1479,6 +1693,7 @@ def main() -> None:
             "protocol_version": REAL_PROTOCOL_VERSION,
             "rng_protocol_version": RNG_PROTOCOL_VERSION,
             "adapter_init_protocol_version": ADAPTER_INIT_PROTOCOL_VERSION,
+            "adapter_state_protocol_version": ADAPTER_STATE_PROTOCOL_VERSION,
             "allocation_protocol_version": ALLOCATION_PROTOCOL_VERSION,
             "run_id": run_id,
             "run_dir": str(run_dir),
@@ -1678,6 +1893,9 @@ def main() -> None:
             target_budget=total_budget,
             tolerance=args.identity_tolerance,
             require_identity_control=args.include_identity_control,
+            minimum_first_step_gradient_l2=args.minimum_first_step_gradient_l2,
+            minimum_adapter_delta_l2=args.minimum_adapter_delta_l2,
+            minimum_effective_update_l2=args.minimum_effective_update_l2,
         )
         checks.update(
             {
@@ -1742,6 +1960,9 @@ def main() -> None:
         target_budget=total_budget,
         tolerance=args.identity_tolerance,
         require_identity_control=args.include_identity_control,
+        minimum_first_step_gradient_l2=args.minimum_first_step_gradient_l2,
+        minimum_adapter_delta_l2=args.minimum_adapter_delta_l2,
+        minimum_effective_update_l2=args.minimum_effective_update_l2,
     )
     checks.update(
         {
@@ -1771,7 +1992,9 @@ def main() -> None:
             f"  {row['strategy']}: initial={row['initial_val_loss']:.6f} "
             f"final={row['final_val_loss']:.6f} "
             f"delta={row['val_loss_delta']:.6f} "
-            f"ppl={row['perplexity']:.4f} params={row['trainable_params']}"
+            f"ppl={row['perplexity']:.4f} params={row['trainable_params']} "
+            f"grad={row['first_step_lora_b_gradient_l2']:.3e} "
+            f"update={row['effective_update_frobenius_l2']:.3e}"
         )
     (run_dir / "summary.txt").write_text("\n".join(summary) + "\n", encoding="utf-8")
 

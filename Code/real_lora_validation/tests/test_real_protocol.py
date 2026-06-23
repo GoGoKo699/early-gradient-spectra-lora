@@ -106,3 +106,66 @@ def test_utility_helpers_are_finite_nonnegative_and_padded():
     )
     assert component["a"] == pytest.approx([1.0, 0.25, 0.0])
     assert component["b"] == pytest.approx([0.625, 0.0, 0.0])
+
+
+def test_adapter_activity_metrics_reconstructs_initial_state_and_detects_update():
+    from real_protocol import (
+        adapter_activity_metrics,
+        build_initial_adapter_state,
+        tensor_mapping_sha256,
+    )
+
+    bank = build_nested_init_bank(
+        {"linear": 3, "conv": 2}, max_rank=3, init_std=0.01, seed=23
+    )
+    ranks = {"linear": 2, "conv": 1}
+    classes = {"linear": "Linear", "conv": "Conv1D"}
+    output_dims = {"linear": 4, "conv": 5}
+    initial = build_initial_adapter_state(
+        ranks=ranks,
+        bank=bank,
+        module_classes=classes,
+        output_dims=output_dims,
+    )
+    assert initial["linear.lora_A"].shape == (2, 3)
+    assert initial["linear.lora_B"].shape == (4, 2)
+    assert initial["conv.lora_A"].shape == (2, 1)
+    assert initial["conv.lora_B"].shape == (1, 5)
+
+    final = {name: value.clone() for name, value in initial.items()}
+    final["linear.lora_B"][0, 0] = 0.25
+    final["conv.lora_B"][0, 1] = -0.5
+    metrics = adapter_activity_metrics(
+        initial_state=initial,
+        final_state=final,
+        module_classes=classes,
+        alpha_scale=2.0,
+    )
+    assert metrics["initial_adapter_state_sha256"] == tensor_mapping_sha256(initial)
+    assert metrics["final_adapter_state_sha256"] == tensor_mapping_sha256(final)
+    assert metrics["initial_adapter_state_sha256"] != metrics["final_adapter_state_sha256"]
+    assert metrics["changed_parameter_count"] == 2
+    assert metrics["adapter_parameter_delta_l2"] > 0
+    assert metrics["lora_b_parameter_delta_l2"] > 0
+    assert metrics["effective_update_frobenius_l2"] > 0
+
+
+def test_adapter_activity_metrics_reports_zero_for_inactive_state():
+    from real_protocol import adapter_activity_metrics, build_initial_adapter_state
+
+    bank = build_nested_init_bank({"proj": 2}, max_rank=2, init_std=0.01, seed=29)
+    initial = build_initial_adapter_state(
+        ranks={"proj": 2},
+        bank=bank,
+        module_classes={"proj": "Linear"},
+        output_dims={"proj": 3},
+    )
+    metrics = adapter_activity_metrics(
+        initial_state=initial,
+        final_state={name: value.clone() for name, value in initial.items()},
+        module_classes={"proj": "Linear"},
+        alpha_scale=2.0,
+    )
+    assert metrics["changed_parameter_count"] == 0
+    assert metrics["adapter_parameter_delta_l2"] == 0.0
+    assert metrics["effective_update_frobenius_l2"] == 0.0

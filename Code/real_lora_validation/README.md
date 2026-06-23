@@ -23,12 +23,18 @@ snapshots.
 - fixed validation data and fresh, identically seeded training loaders for every
   strategy;
 - an optional duplicate-uniform identity control; and
-- automatic failure if identical allocations produce different training traces
-  or evaluation metrics beyond the declared tolerance.
+- automatic failure if identical allocations produce different training traces,
+  final adapter states, or evaluation metrics beyond the declared tolerance; and
+- an active-adapter gate that records the first-step LoRA gradient, saves the
+  final adapter tensors, independently reconstructs the zero-B initial state,
+  and rejects any run with no parameter movement or no effective low-rank update.
 
 A completed run includes raw calibration batches, activation components,
-allocation and initialization hashes, per-step training histories, named seeds,
-input provenance, protocol checks, and a complete recursive SHA-256 manifest.
+allocation and initialization hashes, per-step training histories, final adapter
+state files, named seeds, input provenance, protocol checks, and a complete
+recursive SHA-256 manifest. The saved adapter states let the validator recompute
+parameter movement and the effective update matrix rather than trusting a logged
+boolean.
 
 ## Allocation strategies
 
@@ -102,6 +108,9 @@ Real LoRA protocol smoke release: PASS
 ```
 
 Smoke results verify execution only. They must not be imported into the paper.
+The tiny smoke may show no visible validation-loss change at printed precision,
+but it must now show nonzero first-step LoRA-B gradients, nonzero saved-parameter
+movement, and a nonzero effective update.
 
 ## Manual source-run validation
 
@@ -114,7 +123,7 @@ python scripts/validate_real_lora_run.py \
 ## Manual release validation
 
 ```bash
-python scripts/validate_real_lora_release.py \
+PYTHONDONTWRITEBYTECODE=1 python -B scripts/validate_real_lora_release.py \
   runs/real_lora_releases/<run_id> \
   --expected-kind smoke
 

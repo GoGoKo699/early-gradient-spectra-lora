@@ -10,6 +10,8 @@ import platform
 import shutil
 import subprocess
 import sys
+
+sys.dont_write_bytecode = True
 import tarfile
 import tempfile
 from datetime import datetime, timezone
@@ -44,6 +46,10 @@ CODE_SNAPSHOT_FILES = [
     "scripts/validate_real_lora_run.py",
     "scripts/validate_real_lora_release.py",
     "scripts/build_real_lora_release.py",
+    "tests/conftest.py",
+    "tests/test_real_protocol.py",
+    "tests/test_runner_protocol.py",
+    "tests/test_spectral_metrics.py",
 ]
 
 

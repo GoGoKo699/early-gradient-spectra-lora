@@ -7,6 +7,8 @@ import csv
 import json
 import math
 import sys
+
+sys.dont_write_bytecode = True
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -19,16 +21,20 @@ if str(ROOT) not in sys.path:
 
 from real_protocol import (  # noqa: E402
     ADAPTER_INIT_PROTOCOL_VERSION,
+    ADAPTER_STATE_PROTOCOL_VERSION,
     ALLOCATION_PROTOCOL_VERSION,
     REAL_PROTOCOL_VERSION,
     RNG_PROTOCOL_VERSION,
     RUN_MANIFEST_VERSION,
+    adapter_activity_metrics,
     assignment_sha256,
     bank_slice,
+    build_initial_adapter_state,
     canonical_json_sha256,
     float_sequence_sha256,
     seed_manifest,
     sha256_file,
+    tensor_mapping_sha256,
     tensor_sha256,
 )
 
@@ -112,6 +118,37 @@ def load_bank(path: Path) -> dict[str, torch.Tensor]:
     return tensors
 
 
+def load_adapter_state(path: Path) -> dict[str, Any]:
+    try:
+        payload = torch.load(path, map_location="cpu", weights_only=True)
+    except TypeError:  # pragma: no cover - compatibility with older torch.
+        payload = torch.load(path, map_location="cpu")
+    require(isinstance(payload, dict), "adapter state payload must be a dictionary")
+    require(
+        payload.get("schema_version") == ADAPTER_STATE_PROTOCOL_VERSION,
+        "adapter state protocol version mismatch",
+    )
+    parameters = payload.get("parameters")
+    require(isinstance(parameters, dict) and parameters, "adapter state has no parameters")
+    require(
+        all(isinstance(value, torch.Tensor) for value in parameters.values()),
+        "adapter state contains a non-tensor parameter",
+    )
+    payload["parameters"] = {
+        str(name): value.detach().to(device="cpu", dtype=torch.float32)
+        for name, value in parameters.items()
+    }
+    return payload
+
+
+def close_number(actual: float, expected: float, label: str) -> None:
+    tolerance = max(1e-12, 1e-9 * max(abs(actual), abs(expected), 1.0))
+    require(
+        abs(actual - expected) <= tolerance,
+        f"{label}={actual}; expected {expected} within {tolerance}",
+    )
+
+
 def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, Any]:
     run_dir = run_dir.resolve()
     require(run_dir.is_dir(), f"run directory does not exist: {run_dir}")
@@ -124,6 +161,10 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
     require(
         config.get("adapter_init_protocol_version") == ADAPTER_INIT_PROTOCOL_VERSION,
         "adapter initialization protocol mismatch",
+    )
+    require(
+        config.get("adapter_state_protocol_version") == ADAPTER_STATE_PROTOCOL_VERSION,
+        "adapter state protocol mismatch",
     )
     require(
         config.get("allocation_protocol_version") == ALLOCATION_PROTOCOL_VERSION,
@@ -168,6 +209,12 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
     require(metric_rows, "calibration_metrics.csv is empty")
     metric_by_module = {row["name"]: row for row in metric_rows}
     require(set(metric_by_module) == set(bank), "calibration module set mismatch")
+    module_classes = {
+        module: str(row["module_class"]) for module, row in metric_by_module.items()
+    }
+    output_dims = {
+        module: int(row["out_dim"]) for module, row in metric_by_module.items()
+    }
     for module, row in metric_by_module.items():
         require(int(row["calibration_batches"]) >= 1, f"no calibration batches for {module}")
         for field in [
@@ -238,6 +285,10 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
 
     status = str(config.get("status"))
     checks = read_json(run_dir / "protocol_checks.json")
+    require(
+        checks.get("schema_version") == RUN_MANIFEST_VERSION,
+        "protocol check schema mismatch",
+    )
     require(bool(checks.get("exact_parameter_cost")), "protocol exact-cost check is false")
     require(bool(checks.get("calibration_model_mode_eval")), "protocol eval-calibration check is false")
     require(bool(checks.get("named_rng_streams")), "protocol named-RNG check is false")
@@ -252,6 +303,31 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
         require(set(result_by_strategy) == set(expected_strategies), "result strategy set mismatch")
         initial_losses = []
         groups: dict[str, list[dict[str, str]]] = defaultdict(list)
+        minimum_first_gradient = finite_number(
+            config["minimum_first_step_gradient_l2"],
+            "minimum_first_step_gradient_l2",
+        )
+        minimum_delta = finite_number(
+            config["minimum_adapter_delta_l2"], "minimum_adapter_delta_l2"
+        )
+        minimum_effective = finite_number(
+            config["minimum_effective_update_l2"],
+            "minimum_effective_update_l2",
+        )
+        for label, value in [
+            ("minimum_first_step_gradient_l2", minimum_first_gradient),
+            ("minimum_adapter_delta_l2", minimum_delta),
+            ("minimum_effective_update_l2", minimum_effective),
+        ]:
+            require(value >= 0, f"{label} is negative")
+            close_number(float(checks[label]), value, f"protocol_checks.{label}")
+
+        activity_numeric_fields = [
+            "adapter_parameter_delta_l2",
+            "lora_a_parameter_delta_l2",
+            "lora_b_parameter_delta_l2",
+            "effective_update_frobenius_l2",
+        ]
         for strategy, row in result_by_strategy.items():
             require(int(row["trainable_params"]) == target_budget, f"result budget mismatch for {strategy}")
             require(int(row["budget_residual"]) == 0, f"result budget residual for {strategy}")
@@ -263,7 +339,116 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
             require(len(history) == int(config["steps"]), f"history length mismatch for {strategy}")
             trace = float_sequence_sha256([float(item["train_loss"]) for item in history])
             require(trace == row["train_trace_sha256"], f"training trace hash mismatch for {strategy}")
+
+            expected_filename = f"adapter_state_{strategy}.pt"
+            require(
+                row["adapter_state_file"] == expected_filename,
+                f"adapter state filename mismatch for {strategy}",
+            )
+            state_path = run_dir / expected_filename
+            require(state_path.is_file(), f"adapter state file missing for {strategy}")
+            require(
+                sha256_file(state_path) == row["adapter_state_file_sha256"],
+                f"adapter state file hash mismatch for {strategy}",
+            )
+            state_payload = load_adapter_state(state_path)
+            require(state_payload.get("strategy") == strategy, f"adapter state strategy mismatch for {strategy}")
+            require(
+                state_payload.get("assignment_sha256")
+                == assignment_by_strategy[strategy],
+                f"adapter state assignment mismatch for {strategy}",
+            )
+            close_number(
+                float(state_payload.get("alpha_scale")),
+                float(config["lora_alpha_scale"]),
+                f"adapter state alpha scale for {strategy}",
+            )
+            final_state = state_payload["parameters"]
+            initial_state = build_initial_adapter_state(
+                ranks=ranks_by_strategy[strategy],
+                bank=bank,
+                module_classes=module_classes,
+                output_dims=output_dims,
+            )
+            require(
+                tensor_mapping_sha256(initial_state)
+                == row["initial_adapter_state_sha256"],
+                f"initial adapter state hash mismatch for {strategy}",
+            )
+            activity = adapter_activity_metrics(
+                initial_state=initial_state,
+                final_state=final_state,
+                module_classes=module_classes,
+                alpha_scale=float(config["lora_alpha_scale"]),
+            )
+            require(
+                activity["final_adapter_state_sha256"]
+                == row["final_adapter_state_sha256"],
+                f"final adapter state hash mismatch for {strategy}",
+            )
+            require(
+                activity["initial_adapter_state_sha256"]
+                == row["initial_adapter_state_sha256"],
+                f"recomputed initial state hash mismatch for {strategy}",
+            )
+            require(
+                int(activity["adapter_parameter_count"]) == target_budget,
+                f"adapter state parameter count mismatch for {strategy}",
+            )
+            require(
+                int(row["adapter_parameter_count"]) == target_budget,
+                f"recorded adapter parameter count mismatch for {strategy}",
+            )
+            require(
+                int(activity["changed_parameter_count"])
+                == int(row["changed_parameter_count"]),
+                f"changed parameter count mismatch for {strategy}",
+            )
+            require(
+                int(activity["changed_parameter_count"]) > 0,
+                f"no adapter parameters changed for {strategy}",
+            )
+            for field in activity_numeric_fields:
+                close_number(
+                    float(row[field]),
+                    float(activity[field]),
+                    f"{strategy}.{field}",
+                )
+            first_gradient = finite_number(
+                row["first_step_adapter_gradient_l2"],
+                f"{strategy}.first_step_adapter_gradient_l2",
+            )
+            first_b_gradient = finite_number(
+                row["first_step_lora_b_gradient_l2"],
+                f"{strategy}.first_step_lora_b_gradient_l2",
+            )
+            require(
+                first_gradient > minimum_first_gradient,
+                f"first-step adapter gradient inactive for {strategy}",
+            )
+            require(
+                first_b_gradient > minimum_first_gradient,
+                f"first-step LoRA-B gradient inactive for {strategy}",
+            )
+            require(
+                float(activity["adapter_parameter_delta_l2"]) > minimum_delta,
+                f"adapter parameter delta inactive for {strategy}",
+            )
+            require(
+                float(activity["lora_b_parameter_delta_l2"]) > minimum_delta,
+                f"LoRA-B parameter delta inactive for {strategy}",
+            )
+            require(
+                float(activity["effective_update_frobenius_l2"])
+                > minimum_effective,
+                f"effective LoRA update inactive for {strategy}",
+            )
+            require(
+                str(row["adapter_activity_passed"]).lower() in {"true", "1"},
+                f"adapter activity flag is false for {strategy}",
+            )
             groups[row["assignment_sha256"]].append(row)
+
         tolerance = float(config["identity_tolerance"])
         require(max(initial_losses) - min(initial_losses) <= tolerance, "initial-loss identity check failed")
         for assignment_hash, rows in groups.items():
@@ -272,11 +457,17 @@ def validate_run(run_dir: Path, expected_kind: str | None = None) -> dict[str, A
             reference = rows[0]
             for row in rows[1:]:
                 require(row["train_trace_sha256"] == reference["train_trace_sha256"], f"identical assignment trace mismatch for {assignment_hash}")
+                require(
+                    row["final_adapter_state_sha256"]
+                    == reference["final_adapter_state_sha256"],
+                    f"identical assignment final-state mismatch for {assignment_hash}",
+                )
                 for field in ["initial_val_loss", "final_val_loss", "val_loss_delta"]:
                     require(abs(float(row[field]) - float(reference[field])) <= tolerance, f"identical assignment metric mismatch for {assignment_hash}/{field}")
         require(bool(checks.get("training_completed")), "training completion check is false")
         require(bool(checks.get("initial_loss_identity")), "initial-loss check is false")
         require(bool(checks.get("identical_assignment_identity")), "identical-assignment check is false")
+        require(bool(checks.get("adapter_activity_nonzero")), "adapter activity check is false")
     elif status == "complete_calibration_only":
         require(not (run_dir / "results.csv").exists(), "calibration-only run unexpectedly has results.csv")
         require(checks.get("training_completed") is False, "calibration-only training flag mismatch")

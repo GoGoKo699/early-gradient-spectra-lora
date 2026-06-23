@@ -17,12 +17,18 @@ except ModuleNotFoundError:
     transformers_stub.AutoTokenizer = object
     sys.modules["transformers"] = transformers_stub
 
-from real_protocol import build_nested_init_bank, float_sequence_sha256
+from real_protocol import (
+    adapter_activity_metrics,
+    build_nested_init_bank,
+    float_sequence_sha256,
+)
 from run_real_lora_validation import (
     LoRALinear,
     TargetSpec,
     apply_lora,
     assert_protocol_invariants,
+    clone_adapter_state,
+    named_adapter_parameters,
     calibrate_spectra,
     make_loader,
 )
@@ -164,6 +170,15 @@ def test_protocol_invariants_accept_identical_assignment_control():
             "val_loss_delta": -0.5,
             "assignment_sha256": "same",
             "train_trace_sha256": trace,
+            "adapter_activity_passed": True,
+            "changed_parameter_count": 1,
+            "first_step_adapter_gradient_l2": 1.0,
+            "first_step_lora_b_gradient_l2": 1.0,
+            "adapter_parameter_delta_l2": 1.0,
+            "lora_b_parameter_delta_l2": 1.0,
+            "effective_update_frobenius_l2": 1.0,
+            "initial_adapter_state_sha256": "initial",
+            "final_adapter_state_sha256": "final",
         }
         for name in allocations
     ]
@@ -194,6 +209,15 @@ def test_protocol_invariants_reject_identical_assignment_divergence():
             "val_loss_delta": -0.5,
             "assignment_sha256": "same",
             "train_trace_sha256": "trace-a",
+            "adapter_activity_passed": True,
+            "changed_parameter_count": 1,
+            "first_step_adapter_gradient_l2": 1.0,
+            "first_step_lora_b_gradient_l2": 1.0,
+            "adapter_parameter_delta_l2": 1.0,
+            "lora_b_parameter_delta_l2": 1.0,
+            "effective_update_frobenius_l2": 1.0,
+            "initial_adapter_state_sha256": "initial",
+            "final_adapter_state_sha256": "final-a",
         },
         {
             "strategy": "uniform_identity_control",
@@ -202,6 +226,15 @@ def test_protocol_invariants_reject_identical_assignment_divergence():
             "val_loss_delta": -0.4,
             "assignment_sha256": "same",
             "train_trace_sha256": "trace-b",
+            "adapter_activity_passed": True,
+            "changed_parameter_count": 1,
+            "first_step_adapter_gradient_l2": 1.0,
+            "first_step_lora_b_gradient_l2": 1.0,
+            "adapter_parameter_delta_l2": 1.0,
+            "lora_b_parameter_delta_l2": 1.0,
+            "effective_update_frobenius_l2": 1.0,
+            "initial_adapter_state_sha256": "initial",
+            "final_adapter_state_sha256": "final-b",
         },
     ]
     with pytest.raises(RuntimeError, match="different training traces"):
@@ -212,4 +245,67 @@ def test_protocol_invariants_reject_identical_assignment_divergence():
             target_budget=8,
             tolerance=1e-7,
             require_identity_control=True,
+        )
+
+
+def test_lora_linear_receives_gradient_and_changes_effective_update():
+    torch.manual_seed(31)
+    model = nn.Sequential()
+    model.add_module("proj", nn.Linear(4, 3))
+    bank = build_nested_init_bank(
+        {"proj": 4}, max_rank=2, init_std=0.05, seed=37
+    )
+    apply_lora(model, {"proj": 2}, alpha_scale=2.0, init_bank=bank)
+    initial = clone_adapter_state(model)
+    parameters = named_adapter_parameters(model)
+    optimizer = torch.optim.AdamW(parameters.values(), lr=1e-2)
+    x = torch.randn(8, 4)
+    target = torch.randn(8, 3)
+    loss = F.mse_loss(model(x), target)
+    loss.backward()
+    assert parameters["proj.lora_B"].grad is not None
+    assert torch.linalg.norm(parameters["proj.lora_B"].grad) > 0
+    optimizer.step()
+    final = clone_adapter_state(model)
+    metrics = adapter_activity_metrics(
+        initial_state=initial,
+        final_state=final,
+        module_classes={"proj": "Linear"},
+        alpha_scale=2.0,
+    )
+    assert metrics["changed_parameter_count"] > 0
+    assert metrics["lora_b_parameter_delta_l2"] > 0
+    assert metrics["effective_update_frobenius_l2"] > 0
+
+
+def test_protocol_invariants_reject_inactive_adapter():
+    specs = {"a": TargetSpec("a", "Linear", 2, 2)}
+    allocations = {"uniform_r1": {"a": 1}}
+    rows = [
+        {
+            "strategy": "uniform_r1",
+            "initial_val_loss": 2.0,
+            "final_val_loss": 2.0,
+            "val_loss_delta": 0.0,
+            "assignment_sha256": "same",
+            "train_trace_sha256": "trace",
+            "adapter_activity_passed": False,
+            "changed_parameter_count": 0,
+            "first_step_adapter_gradient_l2": 0.0,
+            "first_step_lora_b_gradient_l2": 0.0,
+            "adapter_parameter_delta_l2": 0.0,
+            "lora_b_parameter_delta_l2": 0.0,
+            "effective_update_frobenius_l2": 0.0,
+            "initial_adapter_state_sha256": "same-state",
+            "final_adapter_state_sha256": "same-state",
+        }
+    ]
+    with pytest.raises(RuntimeError, match="adapter activity flag"):
+        assert_protocol_invariants(
+            results=rows,
+            allocations=allocations,
+            specs=specs,
+            target_budget=4,
+            tolerance=0.0,
+            require_identity_control=False,
         )

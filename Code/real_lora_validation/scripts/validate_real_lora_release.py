@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+
+sys.dont_write_bytecode = True
 from pathlib import Path
 from typing import Any
 
