@@ -37,6 +37,7 @@ PUBLICATION_CODE_SNAPSHOT_FILES = (
     "spectral_metrics.py",
     "requirements.txt",
     "requirements-tested-rocm721.txt",
+    "pytest.ini",
     "README.md",
     "README_LOCAL_DATA.md",
     "INPUT_MANIFEST.json",

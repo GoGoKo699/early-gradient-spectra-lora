@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from configparser import ConfigParser
 import importlib.util
 import json
 from pathlib import Path
@@ -187,6 +188,14 @@ def test_publication_code_snapshot_contract_is_complete() -> None:
         set(PUBLICATION_CODE_SNAPSHOT_FILES)
     )
     assert all((ROOT / relative).is_file() for relative in PUBLICATION_CODE_SNAPSHOT_FILES)
+
+
+def test_pytest_collection_excludes_generated_release_trees() -> None:
+    parser = ConfigParser()
+    assert parser.read(ROOT / "pytest.ini", encoding="utf-8")
+    assert parser.get("pytest", "testpaths").split() == ["tests"]
+    ignored = set(parser.get("pytest", "norecursedirs").split())
+    assert {"runs", "real_lora_runs", "results", "models", "data"} <= ignored
 
 
 def test_five_run_exact_two_sided_test_cannot_cross_point_zero_five() -> None:
