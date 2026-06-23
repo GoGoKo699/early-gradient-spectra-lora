@@ -1,0 +1,23 @@
+{
+  "analysis_plan_version": "stage4_confirmatory_v1",
+  "frozen_before_corrected_rerun": true,
+  "multiplicity_policy": "Only the hard-knee primary target/predictor pair is confirmatory. The sample-limited counterpart is a prespecified robustness check; all other target/predictor combinations are secondary or exploratory.",
+  "primary_hypothesis": {
+    "condition": "hard_knee",
+    "model": "ordinary least squares with intercept within each seed run",
+    "predictor": "gradient_effective_rank",
+    "predictor_transform": "log2(1+s)",
+    "run_level_summary": "mean R2 and mean Spearman across independent seeds",
+    "target": "near_best_rank_gap_0.1",
+    "target_transform": "log2(rank)"
+  },
+  "robustness_condition": "sample_limited",
+  "schema_version": 1,
+  "secondary_targets": [
+    "near_best_rank_gap_0.2",
+    "recovery_rank_0.7",
+    "recovery_rank_0.8",
+    "penalized_rank_lambda_0.2",
+    "penalized_rank_lambda_0.3"
+  ]
+}

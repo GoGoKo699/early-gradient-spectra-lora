@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "scientific_source_commit": "bbfa459a4ceca34abac2dba3d522eaab970b9f2e",
+  "paper": {
+    "path": "paper.pdf",
+    "sha256": "5320c583432685d115559f3bf04ce0777ae2cb06bee739f9159fcb49533b959f",
+    "pages": 9
+  },
+  "full_releases": [
+    {
+      "study": "stage4",
+      "filename": "stage4_paper_20260622T061351.tar.gz",
+      "sha256": "e1bec75d05b0716b7f0e314c0f18d64fa99875bd07d1e634e31bb1b8c268f2c2",
+      "included_in_git": false
+    },
+    {
+      "study": "synthetic_transformer",
+      "filename": "transformer_publication_20260622T101458Z.tar.gz",
+      "sha256": "b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3",
+      "included_in_git": false
+    },
+    {
+      "study": "real_lora",
+      "filename": "real_lora_publication_20260623T074520Z.tar.gz",
+      "sha256": "4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de",
+      "included_in_git": false
+    }
+  ],
+  "real_model_input_manifest": {
+    "path": "Code/real_lora_validation/INPUT_MANIFEST.json",
+    "sha256": "3479dc2f31c11e0c0bac46e200ac459926ac07deaaa201ac03b342234948a29a",
+    "included_in_git": true,
+    "large_input_files_included_in_git": false
+  }
+}

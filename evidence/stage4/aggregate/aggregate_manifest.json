@@ -1,0 +1,60 @@
+{
+  "analysis_plan_version": "stage4_confirmatory_v1",
+  "conditions": [
+    "hard_knee",
+    "sample_limited"
+  ],
+  "created_utc": "2026-06-22T06:37:20.284766+00:00",
+  "git": {
+    "git_dirty": false,
+    "git_revision": "e78df5898c949b003dfde4a8ac568465a5188b6d",
+    "git_root": "/home/ubuntu/\u4e0b\u8f7d/Lora_Project",
+    "git_status_porcelain": []
+  },
+  "n_source_runs": 10,
+  "predictor_transform": "log2(1+s)",
+  "runtime": {
+    "matplotlib": "3.11.0",
+    "numpy": "2.5.0",
+    "pandas": "3.0.3",
+    "platform": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+    "pyyaml": "6.0.3",
+    "scipy": "1.18.0",
+    "threadpoolctl": "3.6.0"
+  },
+  "schema_version": 1,
+  "seeds_by_condition": {
+    "hard_knee": [
+      101,
+      103,
+      107,
+      109,
+      113
+    ],
+    "sample_limited": [
+      101,
+      103,
+      107,
+      109,
+      113
+    ]
+  },
+  "source_run_ids": [
+    "20260622_141352_stage4_hard_s101",
+    "20260622_141700_stage4_hard_s103",
+    "20260622_142008_stage4_hard_s107",
+    "20260622_142318_stage4_hard_s109",
+    "20260622_142627_stage4_hard_s113",
+    "20260622_142937_stage4_sample_s101",
+    "20260622_143109_stage4_sample_s103",
+    "20260622_143241_stage4_sample_s107",
+    "20260622_143414_stage4_sample_s109",
+    "20260622_143547_stage4_sample_s113"
+  ],
+  "target_denominator": "base_val_loss_minus_best_observed_val_loss",
+  "target_estimand": "observed_rank_sweep_minimum",
+  "target_estimand_version": "observed_best_gap_v1",
+  "target_reference": "best_observed_validation_loss_on_tested_rank_grid",
+  "target_transform": "log2(rank)"
+}

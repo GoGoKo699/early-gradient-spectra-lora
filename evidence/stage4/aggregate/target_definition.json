@@ -1,0 +1,20 @@
+{
+  "degenerate_curve_policy": "if DeltaV <= gap_epsilon, useful-rank targets are undefined (NaN)",
+  "notation": {
+    "base": "V0 = validation loss before adaptation",
+    "best": "Vmin = min_r V(r) over the tested rank grid",
+    "gap": "DeltaV = V0 - Vmin"
+  },
+  "oracle_policy": "oracle_val_loss is diagnostic only and cannot affect empirical useful-rank targets",
+  "schema_version": 1,
+  "target_denominator": "base_val_loss_minus_best_observed_val_loss",
+  "target_estimand": "observed_rank_sweep_minimum",
+  "target_estimand_version": "observed_best_gap_v1",
+  "target_reference": "best_observed_validation_loss_on_tested_rank_grid",
+  "targets": {
+    "near_best": "min r such that V(r) <= Vmin + gamma * DeltaV",
+    "penalized": "argmin_r V(r) + lambda * DeltaV * r / rmax",
+    "recovery": "min r such that (V0 - V(r)) / DeltaV >= rho"
+  },
+  "tie_breaking": "choose the smallest nominal rank"
+}

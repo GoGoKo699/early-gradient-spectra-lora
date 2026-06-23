@@ -1,0 +1,89 @@
+{
+  "plan_version": "real_lora_publication_plan_v1",
+  "release_kind": "publication",
+  "release_prefix": "real_lora_publication",
+  "protocol_version": "real_lora_publication_protocol_v3",
+  "input_manifest": "INPUT_MANIFEST.json",
+  "input_manifest_sha256": "3479dc2f31c11e0c0bac46e200ac459926ac07deaaa201ac03b342234948a29a",
+  "model": {
+    "argument": "models/gpt2_local",
+    "local_files_only": true
+  },
+  "dataset": {
+    "mode": "local",
+    "train_text_file": "data/wikitext2_local/train.txt",
+    "val_text_file": "data/wikitext2_local/validation.txt"
+  },
+  "suites": [
+    {
+      "suite_id": "cattn_cfc",
+      "role": "primary",
+      "seeds": [101, 103, 107, 109, 113, 127, 131, 137],
+      "target_suffixes": "c_attn,c_fc",
+      "max_targets": 0
+    },
+    {
+      "suite_id": "attnproj",
+      "role": "boundary",
+      "seeds": [101, 103, 107],
+      "target_suffixes": "c_attn,attn.c_proj,c_fc",
+      "max_targets": 0
+    }
+  ],
+  "run": {
+    "block_size": 128,
+    "batch_size": 4,
+    "calib_batches": 8,
+    "eval_batches": 32,
+    "steps": 200,
+    "lr": 0.0002,
+    "weight_decay": 0.0,
+    "grad_clip": 1.0,
+    "uniform_rank": 4,
+    "min_rank": 1,
+    "max_rank": 16,
+    "fisher_reference_rank": 4,
+    "ridge_scale": 0.001,
+    "lora_alpha_scale": 2.0,
+    "lora_init_std": 0.01,
+    "max_train_texts": 5000,
+    "max_val_texts": 1000,
+    "max_train_blocks": 1024,
+    "max_val_blocks": 256,
+    "dtype": "float32",
+    "device": "cuda",
+    "log_every": 20,
+    "strategies": [
+      "uniform",
+      "gradient_norm",
+      "spectral_effective",
+      "eva_activation",
+      "fim_gradient_variance",
+      "gora_sensitivity"
+    ],
+    "include_identity_control": true,
+    "identity_tolerance": 1e-7,
+    "minimum_first_step_gradient_l2": 0.0,
+    "minimum_adapter_delta_l2": 0.0,
+    "minimum_effective_update_l2": 0.0,
+    "deterministic_algorithms": true
+  },
+  "analysis": {
+    "primary_suite": "cattn_cfc",
+    "primary_metric": "final_val_loss",
+    "primary_candidate_strategy": "spectral_effective",
+    "primary_reference_requested_strategy": "uniform",
+    "independent_unit": "suite_seed_run",
+    "delta_definition": "candidate_minus_reference",
+    "lower_is_better": true,
+    "primary_estimand": "Mean paired final-validation-loss difference, spectral_effective minus the exact-cost uniform rank-4 reference, across eight prespecified c_attn/c_fc base-seed runs. Lower is better. The attention-output-projection suite and all other allocation rules are secondary or boundary analyses and are not pooled with the primary suite.",
+    "confidence": 0.95,
+    "two_sided_alpha": 0.05,
+    "bootstrap_resamples": 10000,
+    "exact_sign_flip_test": "two_sided_within_suite_nonzero_deltas",
+    "secondary_multiplicity": "holm_within_suite",
+    "boundary_inference": "descriptive_only_not_pooled",
+    "minimum_nonzero_primary_deltas_for_resolution": 6,
+    "planned_tie_tolerance": 2
+  }
+}

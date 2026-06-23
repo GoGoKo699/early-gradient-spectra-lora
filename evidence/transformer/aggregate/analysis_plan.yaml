@@ -1,0 +1,36 @@
+plan_version: transformer_publication_plan_v1
+release_kind: publication
+release_prefix: transformer_publication
+protocol_version: synthetic_transformer_publication_protocol_v4
+seeds: [101, 103, 107, 109, 113]
+
+tasks:
+  - task_name: modular
+    config: configs/publication_modular.yaml
+  - task_name: associative_recall
+    config: configs/publication_associative_recall.yaml
+
+analysis:
+  primary_scope: task_stratified_omnibus
+  task_weighting: equal_weight_across_task_families
+  generalization_scope: conditional_on_prespecified_task_families
+  secondary_task_specific: true
+  primary_scaling_mode: fixed_update_scale
+  primary_allocation_rule: soft_dimension
+  primary_reference_rule: uniform_exact_cost
+  primary_metric: final_val_loss
+  independent_unit: task_seed_run
+  primary_estimand: >-
+    Within each task/base-seed run, average the paired final-validation-loss
+    difference (soft_dimension minus uniform_exact_cost) equally across the
+    pre-specified budget caps after averaging adaptation replicates. Within each
+    pre-specified task family, average over independent base-seed runs; the
+    confirmatory omnibus estimand is the equal-weight average of those task-
+    family means. Inference is conditional on these two pre-specified task
+    families, with task-specific estimates reported as secondary analyses.
+  budget_weighting: equal_weight_within_run
+  scaling_conditions_analyzed_separately: true
+  two_sided_alpha: 0.05
+  confidence: 0.95
+  cluster_bootstrap_resamples: 10000
+  exact_sign_flip_test: two_sided_task_stratified
