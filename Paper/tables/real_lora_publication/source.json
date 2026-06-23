@@ -1,0 +1,60 @@
+{
+  "activity_gate_runs": 11,
+  "analysis_plan_sha256": "e407ba9f34946cfaa6a1246ebd55247b4fdc208d22de5bc1bd279d0c63a7da7b",
+  "analysis_plan_version": "real_lora_publication_plan_v1",
+  "boundary_spectral_mean_loss_delta": 0.0010871663689611,
+  "exact_cost_runs": 11,
+  "identity_control_runs": 11,
+  "importer": "import_real_lora_results.py",
+  "n_aggregate_checksums": 9,
+  "n_allocation_rows": 2100,
+  "n_boundary_runs": 3,
+  "n_paired_candidate_rows": 55,
+  "n_primary_runs": 8,
+  "n_recursive_checksums": 354,
+  "n_result_rows": 77,
+  "n_run_checksum_entries": 297,
+  "n_source_runs": 11,
+  "outputs": {
+    "analysis_by_suite_strategy.csv": {
+      "relative_path": "tables/real_lora_publication/analysis_by_suite_strategy.csv",
+      "rows": 10,
+      "sha256": "f7f7294593e2bb796db1f04e9db85a6c4d403c70791c3fdcb3156465f20ecc39"
+    },
+    "primary_analysis.csv": {
+      "relative_path": "tables/real_lora_publication/primary_analysis.csv",
+      "rows": 1,
+      "sha256": "ad7a447494e2465beacb63e93cd7cd81f435d6c9771b10f646b20c2a2f5999fc"
+    },
+    "primary_seed_deltas.csv": {
+      "relative_path": "tables/real_lora_publication/primary_seed_deltas.csv",
+      "rows": 8,
+      "sha256": "9bcdb8af777199f6ac2b37bced86707c0d9262afda0bf5be4eb003d9b3c4f25b"
+    },
+    "spectral_seed_deltas.csv": {
+      "relative_path": "tables/real_lora_publication/spectral_seed_deltas.csv",
+      "rows": 11,
+      "sha256": "16e3a57b5632a6bc4f35de9eb1809e5f84d860f31373444d08982b4b5cd8b2df"
+    },
+    "strategy_summary.csv": {
+      "relative_path": "tables/real_lora_publication/strategy_summary.csv",
+      "rows": 12,
+      "sha256": "723e2cbf0a250649e145f96edad2a77a763e4c26c0dec920ae9f23008795817f"
+    }
+  },
+  "primary_bootstrap_ci": [
+    -0.0083426544442773,
+    -0.0060258745914326
+  ],
+  "primary_exact_sign_flip_p_two_sided": 0.0078125,
+  "primary_holm_p_within_suite": 0.0390625,
+  "primary_losses": 0,
+  "primary_mean_loss_delta": -0.0070257661864162,
+  "primary_ties": 0,
+  "primary_wins": 8,
+  "protocol_version": "real_lora_publication_protocol_v3",
+  "release_schema_version": "real_lora_publication_release_v1",
+  "source_archive_sha256": "4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de",
+  "source_git_commit": "9d8547ca172ffcc8e059351b8d91a4fc92d36b7e",
+  "source_release_id": "real_lora_publication_20260623T074520Z"
+}

@@ -84,6 +84,48 @@ TRANSFORMER_PREDICTOR_DISPLAY = {
     "effective_rank": "Effective rank",
     "soft_dimension": "Soft dimension",
 }
+REAL_LORA_TABLE_ROOT = TABLES / "real_lora_publication"
+REAL_LORA_PLAN_SHA256 = "e407ba9f34946cfaa6a1246ebd55247b4fdc208d22de5bc1bd279d0c63a7da7b"
+REAL_LORA_PLAN_VERSION = "real_lora_publication_plan_v1"
+REAL_LORA_PROTOCOL = "real_lora_publication_protocol_v3"
+REAL_LORA_RELEASE_ID = "real_lora_publication_20260623T074520Z"
+REAL_LORA_ARCHIVE_SHA256 = "4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de"
+REAL_LORA_SOURCE_GIT_COMMIT = "9d8547ca172ffcc8e059351b8d91a4fc92d36b7e"
+REAL_LORA_PROVENANCE_COLUMNS = (
+    "source_release_id",
+    "source_archive_sha256",
+    "analysis_plan_sha256",
+    "analysis_plan_version",
+    "protocol_version",
+    "source_git_commit",
+)
+REAL_LORA_OUTPUT_FILES = {
+    "primary": "primary_analysis.csv",
+    "primary_seeds": "primary_seed_deltas.csv",
+    "analysis": "analysis_by_suite_strategy.csv",
+    "summary": "strategy_summary.csv",
+    "spectral_seeds": "spectral_seed_deltas.csv",
+}
+REAL_LORA_SUITE_DISPLAY = {
+    "cattn_cfc": r"$c_{attn},c_{fc}$",
+    "attnproj": r"$+a_{proj}$",
+}
+REAL_LORA_STRATEGY_DISPLAY = {
+    "spectral_effective": "spectral effective",
+    "eva_activation": "EVA-style allocation",
+    "uniform_r4": "uniform rank 4",
+    "gora_sensitivity": "GoRA-style allocation",
+    "gradient_norm": "gradient norm",
+    "fim_gradient_variance": "FIM-LoRA-style allocation",
+}
+REAL_LORA_STRATEGY_ORDER = (
+    "spectral_effective",
+    "eva_activation",
+    "uniform_r4",
+    "gora_sensitivity",
+    "gradient_norm",
+    "fim_gradient_variance",
+)
 ROW_END = r" \\"
 
 
@@ -369,6 +411,203 @@ def _load_transformer_publication_tables() -> dict[str, pd.DataFrame]:
     return frames
 
 
+def _load_real_lora_publication_tables() -> dict[str, pd.DataFrame]:
+    """Load only checksum-bound tables from the controlled 8+3 GPT-2 release."""
+
+    source_path = REAL_LORA_TABLE_ROOT / "source.json"
+    if not source_path.is_file():
+        raise FileNotFoundError(
+            f"missing {source_path}; run Paper/import_real_lora_results.py first"
+        )
+    source = json.loads(source_path.read_text(encoding="utf-8"))
+    if not isinstance(source, dict):
+        raise ValueError(f"{source_path} must contain a JSON object")
+
+    expected_source = {
+        "source_release_id": REAL_LORA_RELEASE_ID,
+        "source_archive_sha256": REAL_LORA_ARCHIVE_SHA256,
+        "analysis_plan_sha256": REAL_LORA_PLAN_SHA256,
+        "analysis_plan_version": REAL_LORA_PLAN_VERSION,
+        "protocol_version": REAL_LORA_PROTOCOL,
+        "source_git_commit": REAL_LORA_SOURCE_GIT_COMMIT,
+        "release_schema_version": "real_lora_publication_release_v1",
+        "n_recursive_checksums": 354,
+        "n_aggregate_checksums": 9,
+        "n_source_runs": 11,
+        "n_run_checksum_entries": 297,
+        "n_primary_runs": 8,
+        "n_boundary_runs": 3,
+        "n_paired_candidate_rows": 55,
+        "n_result_rows": 77,
+        "n_allocation_rows": 2100,
+        "identity_control_runs": 11,
+        "exact_cost_runs": 11,
+        "activity_gate_runs": 11,
+        "primary_wins": 8,
+        "primary_ties": 0,
+        "primary_losses": 0,
+        "importer": "import_real_lora_results.py",
+    }
+    for key, expected in expected_source.items():
+        if source.get(key) != expected:
+            raise ValueError(
+                f"{source_path}: {key}={source.get(key)!r}; expected {expected!r}"
+            )
+
+    expected_floats = {
+        "primary_mean_loss_delta": -0.0070257661864162,
+        "primary_exact_sign_flip_p_two_sided": 0.0078125,
+        "primary_holm_p_within_suite": 0.0390625,
+        "boundary_spectral_mean_loss_delta": 0.0010871663689611,
+    }
+    for key, expected in expected_floats.items():
+        if not math.isclose(float(source.get(key)), expected, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError(f"{source_path}: {key} disagrees with the verified release")
+    interval = source.get("primary_bootstrap_ci")
+    if not isinstance(interval, list) or len(interval) != 2:
+        raise ValueError(f"{source_path} lacks the primary bootstrap interval")
+    for observed, expected in zip(interval, (-0.0083426544442773, -0.0060258745914326)):
+        if not math.isclose(float(observed), expected, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError(f"{source_path}: primary interval disagrees with release")
+
+    output_manifest = source.get("outputs")
+    if not isinstance(output_manifest, dict):
+        raise ValueError(f"{source_path} lacks paper-output checksums")
+    expected_names = set(REAL_LORA_OUTPUT_FILES.values())
+    observed_names = {path.name for path in REAL_LORA_TABLE_ROOT.glob("*.csv")}
+    if observed_names != expected_names:
+        raise ValueError(
+            "real-model publication table set is not exact; "
+            f"unexpected={sorted(observed_names - expected_names)}, "
+            f"missing={sorted(expected_names - observed_names)}"
+        )
+
+    expected_provenance = {
+        "source_release_id": REAL_LORA_RELEASE_ID,
+        "source_archive_sha256": REAL_LORA_ARCHIVE_SHA256,
+        "analysis_plan_sha256": REAL_LORA_PLAN_SHA256,
+        "analysis_plan_version": REAL_LORA_PLAN_VERSION,
+        "protocol_version": REAL_LORA_PROTOCOL,
+        "source_git_commit": REAL_LORA_SOURCE_GIT_COMMIT,
+    }
+    frames: dict[str, pd.DataFrame] = {}
+    for key, filename in REAL_LORA_OUTPUT_FILES.items():
+        path = REAL_LORA_TABLE_ROOT / filename
+        record = output_manifest.get(filename)
+        if not isinstance(record, dict):
+            raise ValueError(f"{source_path} lacks output record {filename!r}")
+        if record.get("relative_path") != path.relative_to(PAPER).as_posix():
+            raise ValueError(f"{source_path} records the wrong path for {filename}")
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"missing {path}; run Paper/import_real_lora_results.py first"
+            )
+        if _sha256(path) != record.get("sha256"):
+            raise ValueError(f"paper real-model table checksum mismatch: {path}")
+        frame = pd.read_csv(path)
+        if frame.empty or int(record.get("rows", -1)) != len(frame):
+            raise ValueError(f"{path} is empty or its recorded row count is stale")
+        missing = sorted(set(REAL_LORA_PROVENANCE_COLUMNS) - set(frame.columns))
+        if missing:
+            raise ValueError(f"{path} lacks provenance columns {missing}")
+        for column, expected in expected_provenance.items():
+            values = set(frame[column].dropna().astype(str))
+            if values != {str(expected)}:
+                raise ValueError(f"{path} has mixed or stale {column}: {values}")
+        frames[key] = frame
+
+    primary = frames["primary"]
+    if len(primary) != 1:
+        raise ValueError("real-model primary table must contain exactly one row")
+    row = primary.iloc[0]
+    required_primary = {
+        "analysis_scope": "prespecified_primary_suite",
+        "suite_id": "cattn_cfc",
+        "suite_role": "primary",
+        "candidate_strategy": "spectral_effective",
+        "reference_strategy": "uniform_r4",
+        "delta_definition": "candidate_minus_reference",
+    }
+    for column, expected in required_primary.items():
+        if str(row[column]) != expected:
+            raise ValueError(f"real-model primary {column}={row[column]!r}; expected {expected!r}")
+    for column, expected in {
+        "n_independent_runs": 8,
+        "n_nonzero_deltas": 8,
+        "wins": 8,
+        "ties": 0,
+        "losses": 0,
+        "distinct_assignment_runs": 8,
+        "identical_assignment_runs": 0,
+        "bootstrap_resamples": 10000,
+    }.items():
+        if int(row[column]) != expected:
+            raise ValueError(f"real-model primary {column}={row[column]!r}; expected {expected}")
+    for column, expected in {
+        "mean_loss_delta": expected_floats["primary_mean_loss_delta"],
+        "bootstrap_ci_low": float(interval[0]),
+        "bootstrap_ci_high": float(interval[1]),
+        "exact_sign_flip_p_two_sided": expected_floats[
+            "primary_exact_sign_flip_p_two_sided"
+        ],
+        "holm_p_within_suite": expected_floats["primary_holm_p_within_suite"],
+    }.items():
+        if not math.isclose(float(row[column]), expected, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError(f"real-model primary {column} disagrees with {source_path}")
+
+    analysis = frames["analysis"]
+    candidates = {
+        "gradient_norm",
+        "spectral_effective",
+        "eva_activation",
+        "fim_gradient_variance",
+        "gora_sensitivity",
+    }
+    expected_pairs = {(suite, strategy) for suite in REAL_LORA_SUITE_DISPLAY for strategy in candidates}
+    observed_pairs = set(zip(analysis["suite_id"].astype(str), analysis["candidate_strategy"].astype(str)))
+    if len(analysis) != 10 or observed_pairs != expected_pairs:
+        raise ValueError("real-model suite-by-strategy analysis is incomplete")
+    if set(analysis["reference_strategy"].astype(str)) != {"uniform_r4"}:
+        raise ValueError("real-model comparisons do not use the frozen uniform reference")
+    run_counts = analysis.groupby("suite_id")["n_independent_runs"].first().to_dict()
+    if {str(k): int(v) for k, v in run_counts.items()} != {"attnproj": 3, "cattn_cfc": 8}:
+        raise ValueError("real-model suite run counts differ from the frozen design")
+
+    summary = frames["summary"]
+    expected_summary = {
+        (suite, strategy)
+        for suite in REAL_LORA_SUITE_DISPLAY
+        for strategy in REAL_LORA_STRATEGY_ORDER
+    }
+    observed_summary = set(zip(summary["suite_id"].astype(str), summary["strategy"].astype(str)))
+    if len(summary) != 12 or observed_summary != expected_summary:
+        raise ValueError("real-model strategy summary is incomplete")
+    expected_params = {"cattn_cfc": 331776.0, "attnproj": 405504.0}
+    for suite, expected in expected_params.items():
+        subset = summary[summary["suite_id"].astype(str).eq(suite)]
+        if set(pd.to_numeric(subset["mean_trainable_params"], errors="raise")) != {expected}:
+            raise ValueError(f"{suite} strategies are not exact-cost matched")
+
+    primary_seeds = frames["primary_seeds"]
+    if len(primary_seeds) != 8 or set(pd.to_numeric(primary_seeds["seed"], errors="raise").astype(int)) != {101, 103, 107, 109, 113, 127, 131, 137}:
+        raise ValueError("real-model primary seed table differs from the frozen design")
+    spectral_seeds = frames["spectral_seeds"]
+    spectral_units = set(
+        zip(
+            spectral_seeds["suite_id"].astype(str),
+            pd.to_numeric(spectral_seeds["seed"], errors="raise").astype(int),
+        )
+    )
+    expected_units = {
+        *(("cattn_cfc", seed) for seed in (101, 103, 107, 109, 113, 127, 131, 137)),
+        *(("attnproj", seed) for seed in (101, 103, 107)),
+    }
+    if len(spectral_seeds) != 11 or spectral_units != expected_units:
+        raise ValueError("real-model spectral seed table differs from the frozen design")
+
+    return frames
+
+
 def _latex_row(*cells: object) -> str:
     return " & ".join(str(cell) for cell in cells) + ROW_END
 
@@ -449,6 +688,53 @@ def make_transformer_publication_rows() -> None:
         )
         previous_task = task
     _write(GENERATED / "transformer_sitewise_rows.tex", "\n".join(rows) + "\n")
+
+
+def make_real_lora_publication_rows() -> None:
+    frames = _load_real_lora_publication_tables()
+    summary = frames["summary"].copy()
+    analysis = frames["analysis"].copy()
+    rows: list[str] = []
+    for suite_index, suite in enumerate(("cattn_cfc", "attnproj")):
+        if suite_index:
+            rows.append(r"\midrule")
+        for strategy in REAL_LORA_STRATEGY_ORDER:
+            srow = summary[
+                summary["suite_id"].astype(str).eq(suite)
+                & summary["strategy"].astype(str).eq(strategy)
+            ]
+            if len(srow) != 1:
+                raise ValueError(f"missing real-model summary row: {suite}/{strategy}")
+            srow = srow.iloc[0]
+            if strategy == "uniform_r4":
+                delta = "$0$ (reference)"
+                interval = "--"
+                wins = "--"
+            else:
+                arow = analysis[
+                    analysis["suite_id"].astype(str).eq(suite)
+                    & analysis["candidate_strategy"].astype(str).eq(strategy)
+                ]
+                if len(arow) != 1:
+                    raise ValueError(f"missing real-model analysis row: {suite}/{strategy}")
+                arow = arow.iloc[0]
+                delta = f"${_fmt(arow['mean_loss_delta'], 4, signed=True)}$"
+                interval = (
+                    f"$[{_fmt(arow['bootstrap_ci_low'], 4, signed=True)},\\,"
+                    f"{_fmt(arow['bootstrap_ci_high'], 4, signed=True)}]$"
+                )
+                wins = f"${int(arow['wins'])}/{int(arow['n_independent_runs'])}$"
+            rows.append(
+                _latex_row(
+                    REAL_LORA_SUITE_DISPLAY[suite],
+                    REAL_LORA_STRATEGY_DISPLAY[strategy],
+                    f"{_fmt(srow['mean_final_val_loss'], 4)} ({_fmt(srow['sem_final_val_loss'], 4)})",
+                    delta,
+                    interval,
+                    wins,
+                )
+            )
+    _write(GENERATED / "real_lora_rows.tex", "\n".join(rows) + "\n")
 
 
 def make_transformer_publication_figure() -> None:
@@ -639,18 +925,20 @@ def main() -> None:
     parser.add_argument(
         "--validate-only",
         action="store_true",
-        help="Validate Stage4 and transformer paper inputs without writing artifacts.",
+        help="Validate Stage4, transformer, and real-model paper inputs without writing artifacts.",
     )
     args = parser.parse_args()
     if args.validate_only:
         _load_stage4_table()
         _load_transformer_publication_tables()
+        _load_real_lora_publication_tables()
         print("paper artifact input validation: PASS")
         return
 
     _ensure_dirs()
     make_stage4_rows()
     make_transformer_publication_rows()
+    make_real_lora_publication_rows()
     make_bbp_figures()
     make_lora_rank_figures()
     make_alpha_figure()

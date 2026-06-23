@@ -2,140 +2,97 @@
 
 ## Status
 
-The original effective-rank definition and the synthetic-transformer protocol
-have been corrected. Historical real-GPT-2 tables remain provenance only. They
-predate the current stochastic controls, exact-cost adaptive baselines, saved
-adapter-state evidence, and independent multi-seed statistics.
+The effective-rank estimand, synthetic-transformer protocol, and controlled
+real-model protocol have been corrected. The frozen Stage4, synthetic-
+transformer, and GPT-2/Wikitext-2 publication releases have completed their
+independent numerical and provenance audits.
 
-The current real-model protocol is `real_lora_publication_protocol_v3`. Before a
-long rerun, it requires a four-source publication-driver smoke release that proves
-both the end-to-end release pipeline and nonzero LoRA learning.
+The manuscript must now be generated only through the checksum-bound importers.
+Legacy pre-CRN transformer summaries and pre-v3 real-model tables are audit
+history, not paper inputs.
 
-## Existing pinned inputs
+## Frozen real-model release
 
-The publication plan uses:
+The current real-model protocol is `real_lora_publication_protocol_v3` and the
+paper release is:
 
-- `openai-community/gpt2` at commit
-  `607a30d783dfa663caf39e06633721c8d4cfcd7e`;
-- `Salesforce/wikitext`, `wikitext-2-raw-v1`, at commit
-  `b08601e04326c79dfdd32d625aee71d232d685c3`.
+- release ID: `real_lora_publication_20260623T074520Z`;
+- archive SHA-256: `4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de`;
+- analysis-plan SHA-256: `e407ba9f34946cfaa6a1246ebd55247b4fdc208d22de5bc1bd279d0c63a7da7b`;
+- source Git commit: `9d8547ca172ffcc8e059351b8d91a4fc92d36b7e`.
 
-Their exact files and SHA-256 hashes are recorded in
-`Code/real_lora_validation/INPUT_MANIFEST.json`. Do not replace those files or
-regenerate the manifest during a publication run.
+It contains eight primary `c_attn,c_fc` seed runs and three separate
+`c_attn,attn.c_proj,c_fc` boundary runs. The primary comparison is
+`spectral_effective - uniform_r4` final validation loss. The boundary suite is
+not pooled with the primary suite.
 
-## Environment
+## Verify and import the real-model release
 
-Use Python 3.12 and a GPU-enabled PyTorch 2.9.1 environment. The validated AMD
-route uses the existing environment:
+Activate the validated environment, then run:
 
 ```bash
 source "$HOME/venvs/lora-rocm721/bin/activate"
 cd ~/下载/Lora_Project/Code/real_lora_validation
 
-python -m pip install -r requirements.txt
-python -m pip check
-python -m pytest -q
-```
-
-For NVIDIA, install the platform-appropriate PyTorch 2.9.1 build first, then the
-same `requirements.txt`. Publication releases record the exact resolved package
-set and hardware environment.
-
-## Validate the committed plans
-
-```bash
-python scripts/run_real_lora_publication.py \
-  --plan configs/real_lora_publication_smoke_plan.json \
-  --validate-plan-only
-
-python scripts/run_real_lora_publication.py \
-  --plan configs/real_lora_publication_plan.json \
-  --validate-plan-only
-```
-
-The full frozen design contains:
-
-- eight primary `c_attn,c_fc` seed runs: 101, 103, 107, 109, 113, 127, 131,
-  and 137;
-- three descriptive `c_attn,attn.c_proj,c_fc` boundary runs: 101, 103, and 107;
-- exact-cost uniform, gradient-norm, spectral-effective, EVA-style,
-  FIM-style, and GoRA-style allocation rules plus a duplicate-uniform control.
-
-The primary comparison is `spectral_effective - uniform_r4` final validation loss
-across the eight primary seed runs. The boundary suite is not pooled with the
-primary suite.
-
-## Required next gate: four-source driver smoke
-
-```bash
-set -o pipefail
-bash scripts/run_real_lora_publication_smoke.sh 2>&1 \
-  | tee step10_real_lora_publication_smoke.log
-```
-
-The driver runs model subprocesses offline. It removes proxy variables only from
-the child-process environment; it does not modify the parent shell, VPN client,
-NetworkManager, `~/.bashrc`, or `/etc/environment`.
-
-Required final messages:
-
-```text
-Real LoRA publication aggregate: PASS
-Real LoRA publication release validation: PASS
-Real LoRA publication release build: PASS
-Real LoRA publication driver: PASS
-<archive name>.tar.gz: OK
-```
-
-Verify the generated release:
-
-```bash
-RID=$(cat runs/real_lora_releases/LATEST)
+RID="real_lora_publication_20260623T074520Z"
 RELEASE="$PWD/runs/real_lora_releases/$RID"
 ARCHIVE="${RELEASE}.tar.gz"
 
-python -B scripts/validate_real_lora_publication_release.py \
-  "$RELEASE" --expected-kind smoke
+PYTHONDONTWRITEBYTECODE=1 python -B \
+  scripts/validate_real_lora_publication_release.py \
+  "$RELEASE" --expected-kind publication
 
 (
   cd "$(dirname "$ARCHIVE")"
   sha256sum -c "$(basename "${ARCHIVE}.sha256")"
 )
 
-echo "$ARCHIVE"
+cd ~/下载/Lora_Project
+python Paper/import_real_lora_results.py --check-only
+python Paper/make_paper_artifacts.py --validate-only
 ```
 
-Do not run the long publication plan or update the manuscript until that archive
-has been independently checked.
+Required final messages include:
 
-## Long run after the smoke gate
+```text
+Real LoRA publication release validation: PASS
+real_lora_publication_20260623T074520Z.tar.gz: OK
+Real-model manuscript import check: PASS
+paper artifact input validation: PASS
+```
 
-Create and retain one release ID:
+## Build the manuscript
 
 ```bash
-RID="real_lora_publication_$(date -u +%Y%m%dT%H%M%SZ)"
-printf '%s\n' "$RID" | tee "$HOME/real_lora_publication_active_id.txt"
+cd ~/下载/Lora_Project/Paper
+make paper-artifacts
 
-set -o pipefail
-bash scripts/run_real_lora_publication.sh \
-  --release-id "$RID" 2>&1 \
-  | tee "$HOME/${RID}.log"
+SOURCE_DATE_EPOCH=1782123298 FORCE_SOURCE_DATE=1 \
+  pdflatex -interaction=nonstopmode -halt-on-error paper.tex
+SOURCE_DATE_EPOCH=1782123298 FORCE_SOURCE_DATE=1 \
+  pdflatex -interaction=nonstopmode -halt-on-error paper.tex
+
+cp paper.pdf ../paper.pdf
 ```
 
-Resume an interrupted run without changing the repository, environment, inputs,
-or release ID:
+Run both code test suites before freezing the submission:
 
 ```bash
-RID=$(cat "$HOME/real_lora_publication_active_id.txt")
+cd ~/下载/Lora_Project/Code/transformer
+source .venv/bin/activate
+PYTHONPATH=. python -m pytest -q
 
-set -o pipefail
-bash scripts/run_real_lora_publication.sh \
-  --release-id "$RID" \
-  --resume 2>&1 \
-  | tee -a "$HOME/${RID}.log"
+deactivate
+cd ../rmt_lora_sim
+source .venv/bin/activate
+PYTHONPATH=. python -m pytest -q
+
+deactivate
+source "$HOME/venvs/lora-rocm721/bin/activate"
+cd ../real_lora_validation
+PYTHONDONTWRITEBYTECODE=1 python -m pytest -q
 ```
 
-The resume path reuses only complete source runs that pass the full source-run
-validator. Every publication source run is bound to the committed plan hash,
-release ID, suite, seed, model inputs, and dataset inputs.
+Do not regenerate the root `SHA256SUMS.txt`, `PATCH_MANIFEST.json`, or final
+submission archive until the rendered PDF and all tracked files have passed the
+last preflight.

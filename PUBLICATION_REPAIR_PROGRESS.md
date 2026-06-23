@@ -248,3 +248,57 @@ Implemented:
 
 The long 11-run experiment remains blocked until the four-source Step 10 smoke
 archive passes independent verification.
+
+## Step 10 owner design-smoke verification
+
+Status: **completed.**
+
+The four-source driver smoke passed all source-run and release checksums,
+exact-cost and stochastic controls, identity controls, adapter-activity gates,
+and independent aggregate recomputation. Its numerical output was correctly
+classified as non-evidential.
+
+## Step 11 full real-model publication release
+
+Status: **completed and independently verified.**
+
+The frozen release contains eight primary `c_attn,c_fc` runs and three separate
+`c_attn,attn.c_proj,c_fc` boundary runs. All 354 root checksums, nine aggregate
+checksums, 11 source-run manifests, 77 result rows, 2,100 allocation rows, and
+55 paired candidate effects pass independent reconstruction. Every strategy is
+exact-cost matched, every adapter passes the activity gate, and each duplicate
+uniform control is identical in assignment, training trace, final adapter
+state, and metrics.
+
+For the prespecified primary comparison, `spectral_effective - uniform_r4`
+final validation loss is `-0.007025766`, with deterministic bootstrap 95%
+interval `[-0.008342654, -0.006025875]`, exact two-sided sign-flip
+`p=0.0078125`, within-suite Holm-adjusted `p=0.0390625`, and 8/8 wins. The
+three-run attention-output boundary reverses direction (`+0.001087166`, 0/3
+wins) and has exact-test resolution only `0.25`.
+
+## Step 12 checksum-bound real-model manuscript import
+
+Status: **implemented and validation-gated.**
+
+Implemented:
+
+- recursive archive, aggregate, and source-run verification in the manuscript
+  importer;
+- independent reconstruction of all paired effects and prespecified inference;
+- immutable paper-facing tables with release, plan, protocol, archive, and Git
+  provenance columns;
+- removal of superseded pre-v3 real-model tables from manuscript inputs;
+- exact-cost comparison against uniform, gradient norm, and allocation-only
+  EVA-, GoRA-, and FIM-LoRA-style controls;
+- manuscript synchronization with the positive restricted-scope primary result
+  and the reversed module-family boundary; and
+- artifact-generation gates that reject stale, mixed, or modified real-model
+  tables.
+
+## Remaining submission work after Step 12
+
+1. Apply and validate the manuscript-import patch on the owner machine.
+2. Perform the final rendered-PDF, metadata, archive, and root-checksum preflight.
+3. Regenerate `SHA256SUMS.txt` and the top-level submission manifest only after
+   all final artifacts are frozen.

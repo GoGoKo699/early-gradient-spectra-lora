@@ -16,7 +16,7 @@ test-rmt:
 
 test-real:
 	cd real_lora_validation && PYTHONPATH=. python3 -m pytest -q tests
-	cd real_lora_validation && python3 -m py_compile run_real_lora_validation.py spectral_metrics.py hf_gpu_smoke.py scripts/aggregate_real_replicates.py scripts/prepare_publication_inputs.py scripts/preflight_publication_rerun.py scripts/run_publication_correction.py
+	cd real_lora_validation && python3 -m py_compile run_real_lora_validation.py spectral_metrics.py real_protocol.py publication_protocol.py hf_gpu_smoke.py scripts/aggregate_real_replicates.py scripts/aggregate_real_lora_publication.py scripts/prepare_publication_inputs.py scripts/preflight_publication_rerun.py scripts/run_publication_correction.py scripts/run_real_lora_publication.py scripts/build_real_lora_publication_release.py scripts/validate_real_lora_publication_release.py
 
 smoke-rmt:
 	cd rmt_lora_sim && PYTHONPATH=. python3 scripts/run_lora_rank.py --config $(RMT_SMOKE_CFG).yaml
