@@ -32,10 +32,11 @@ The final evidence supports three deliberately scoped conclusions:
 - `SHA256SUMS.txt`: checksums for every non-Git file in this repository.
 
 The scientific source tree was frozen at commit
-`bbfa459a4ceca34abac2dba3d522eaab970b9f2e`. The final packaging commit removes
-obsolete repair notes, adds compact evidence, and regenerates repository
-checksums. Full raw releases and pinned offline model/data inputs are kept
-outside Git because of size; their exact identities are recorded here.
+`bbfa459a4ceca34abac2dba3d522eaab970b9f2e`. Later packaging-only changes add
+compact evidence, byte-reproducible publication build locks, and repository
+checksums; they do not change the analyses or claims. Full raw releases and
+pinned offline model/data inputs are kept outside Git because of size; their
+exact identities are recorded here.
 
 ## Fast reviewer checks
 
@@ -61,17 +62,27 @@ PYTHONDONTWRITEBYTECODE=1 python -m pytest -q
 
 Expected test counts for the frozen artifact are 19, 38, and 37 respectively.
 
-## Build the paper
+## Build and verify the paper
 
-The committed tables and figures allow the paper to compile without the large
+The committed tables and figures allow ordinary compilation without the large
 raw releases:
 
 ```bash
 cd Paper
-SOURCE_DATE_EPOCH=1782123298 FORCE_SOURCE_DATE=1 \
-  pdflatex -interaction=nonstopmode -halt-on-error paper.tex
-SOURCE_DATE_EPOCH=1782123298 FORCE_SOURCE_DATE=1 \
-  pdflatex -interaction=nonstopmode -halt-on-error paper.tex
+make paper
 ```
 
-See `REPRODUCIBILITY.md` for full-release validation and rerun instructions.
+For the release-grade, byte-for-byte check, build the locked linux/amd64 image
+from the repository root. The image build performs two independent clean
+rebuilds and rejects any figure, table, font, TeX, or manuscript hash drift:
+
+```bash
+docker build --platform linux/amd64 \
+  -f Dockerfile.publication \
+  -t early-gradient-spectra-publication .
+```
+
+The canonical environment is CPython 3.12.3, Matplotlib 3.11.0, the exact
+hash-pinned wheels in `Paper/requirements-publication.lock.txt`, and pdfTeX
+1.40.25 from a timestamped Ubuntu package snapshot. See `REPRODUCIBILITY.md`
+for local checks, full-release validation, and rerun instructions.

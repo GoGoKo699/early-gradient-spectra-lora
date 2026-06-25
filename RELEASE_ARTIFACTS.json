@@ -31,5 +31,15 @@
     "sha256": "3479dc2f31c11e0c0bac46e200ac459926ac07deaaa201ac03b342234948a29a",
     "included_in_git": true,
     "large_input_files_included_in_git": false
+  },
+  "publication_build": {
+    "canonical_platform": "linux/amd64",
+    "dockerfile": "Dockerfile.publication",
+    "python_version": "3.12.3",
+    "requirements_lock": "Paper/requirements-publication.lock.txt",
+    "toolchain_lock": "Paper/publication-toolchain.lock.json",
+    "verification_command": "python Paper/verify_publication_reproducibility.py --scope full",
+    "source_date_epoch": 1782123298,
+    "ubuntu_apt_snapshot": "20260622T120000Z"
   }
 }

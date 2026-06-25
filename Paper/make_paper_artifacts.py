@@ -20,6 +20,11 @@ import re
 import sys
 
 import matplotlib as mpl
+
+# Ignore user/site Matplotlib configuration and force a headless backend. The
+# exact Matplotlib wheel and its bundled fonts are checksum-locked separately.
+mpl.use("Agg")
+mpl.rcdefaults()
 mpl.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42})
 import matplotlib.pyplot as plt
 import numpy as np

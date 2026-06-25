@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1
+# Canonical byte-reproducible manuscript build for linux/amd64.
+FROM --platform=linux/amd64 ubuntu@sha256:023f8a753c22258c9fe2d0005a7d28258038da7d620e9f93e9ad78aa266f9f11
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG APT_SNAPSHOT=20260622T120000Z
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TZ=UTC \
+    PYTHONHASHSEED=0 \
+    SOURCE_DATE_EPOCH=1782123298 \
+    FORCE_SOURCE_DATE=1 \
+    MPLBACKEND=Agg \
+    MPLCONFIGDIR=/tmp/matplotlib-publication \
+    PATH=/opt/publication-venv/bin:$PATH \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Ubuntu 24.04+ supports a global archive snapshot. This freezes Python,
+# pdfTeX, LaTeX packages, fonts, and other system-level build dependencies.
+RUN printf 'APT::Snapshot "%s";\n' "$APT_SNAPSHOT" \
+      > /etc/apt/apt.conf.d/50publication-snapshot \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates \
+       make \
+       poppler-utils \
+       python3 \
+       python3-pip \
+       python3-venv \
+       qpdf \
+       texlive-fonts-recommended \
+       texlive-latex-base \
+       texlive-latex-extra \
+       texlive-latex-recommended \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY Paper/requirements-publication.lock.txt /tmp/requirements-publication.lock.txt
+RUN python3 -m venv /opt/publication-venv \
+    && python -m pip install --require-hashes \
+       -r /tmp/requirements-publication.lock.txt \
+    && python -m pip check
+
+WORKDIR /publication
+COPY . /publication
+
+# The image build itself is the release gate: two independent clean rebuilds
+# must reproduce all generated artifacts and the committed manuscript PDF.
+RUN python Paper/verify_publication_reproducibility.py --scope full
+
+CMD ["python", "Paper/verify_publication_reproducibility.py", "--scope", "full"]
