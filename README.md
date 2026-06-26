@@ -9,11 +9,11 @@ The final evidence supports three deliberately scoped conclusions:
 
 1. In the controlled matrix study, early gradient-spectrum summaries predict
    useful low-rank targets across the hard-knee and sample-limited regimes.
-2. In the preregistered synthetic-transformer allocation study, the primary
+2. In the plan-locked synthetic-transformer allocation study, the primary
    soft-dimension rule did **not** outperform its exact-cost uniform comparator:
    mean loss delta `+0.014638`, 95% bootstrap interval
    `[-0.007751, +0.035215]`, exact two-sided sign-flip `p=0.240234`.
-3. In GPT-2/WikiText-2, spectral allocation improved the preregistered primary
+3. In GPT-2/WikiText-2, spectral allocation improved the plan-locked primary
    `c_attn,c_fc` suite relative to exact-cost uniform allocation:
    mean validation-loss delta `-0.007026`, 95% bootstrap interval
    `[-0.008343, -0.006026]`, exact sign-flip `p=0.0078125`, with 8/8 seed
@@ -86,3 +86,12 @@ The canonical environment is CPython 3.12.3, Matplotlib 3.11.0, the exact
 hash-pinned wheels in `Paper/requirements-publication.lock.txt`, and pdfTeX
 1.40.25 from a timestamped Ubuntu package snapshot. See `REPRODUCIBILITY.md`
 for local checks, full-release validation, and rerun instructions.
+
+
+## Artifact integration
+
+This repository is the software and compact-evidence component of the release.
+The full raw releases and pinned real-model inputs are distributed separately in
+the Zenodo data record. `ARTIFACT_LEDGER.md` maps each local source folder to
+its final public artifact, and `PROVENANCE.md` records how the mother workspace
+was used for provenance recovery without being published wholesale.

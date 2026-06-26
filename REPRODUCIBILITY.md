@@ -66,6 +66,7 @@ archives whose names and SHA-256 hashes are listed in
 `RELEASE_ARTIFACTS.json`, extract each archive, then run:
 
 ```bash
+PYTHONPATH=Code/rmt_lora_sim \
 python Code/rmt_lora_sim/scripts/validate_stage4_release.py \
   /path/to/stage4_paper_20260622T061351 \
   --expected-seeds 101,103,107,109,113 \
@@ -81,8 +82,11 @@ python Code/real_lora_validation/scripts/validate_real_lora_publication_release.
   --expected-kind publication
 ```
 
-Each archive contains source runs, recursive checksum manifests, a frozen code
-snapshot, environment provenance, analysis plans, and aggregate outputs.
+The transformer and real-model archives contain source runs, recursive checksum
+manifests, frozen code snapshots, environment provenance, analysis plans, and
+aggregate outputs. The current Stage4 archive contains the raw runs, configs,
+runtime versions, manifests, and aggregates but relies on its recorded Git
+revision in this repository for the validator and experiment code.
 
 ### 3. Full reruns
 
@@ -91,7 +95,16 @@ their frozen plans and scripts. The GPT-2 study additionally requires the
 pinned offline GPT-2 and WikiText-2 inputs recorded in
 `Code/real_lora_validation/INPUT_MANIFEST.json` and a compatible GPU runtime.
 
-For the packaged local artifact, restore those inputs with:
+There are two supported ways to restore those inputs.
+
+Route A, rebuild/download the pinned inputs from the repository script:
+
+```bash
+python Code/real_lora_validation/scripts/prepare_publication_inputs.py
+```
+
+Route B, after downloading and extracting the Zenodo data companion artifact as
+`../Local`, copy the verified prepared inputs:
 
 ```bash
 cp -a ../Local/inputs/real_lora_validation/. \
@@ -99,3 +112,14 @@ cp -a ../Local/inputs/real_lora_validation/. \
 ```
 
 The real-model publication driver is network-offline after preflight.
+
+
+## Linked public artifacts
+
+The final release is expected to have two persistent records:
+
+- software/code DOI: `TBD`;
+- full raw evidence and input-data DOI: `TBD`.
+
+`RELEASE_ARTIFACTS.json` and `ARTIFACT_LEDGER.md` should be updated with final
+DOIs before public tagging.
