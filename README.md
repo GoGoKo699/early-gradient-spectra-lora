@@ -95,3 +95,17 @@ The full raw releases and pinned real-model inputs are distributed separately in
 the Zenodo data record. `ARTIFACT_LEDGER.md` maps each local source folder to
 its final public artifact, and `PROVENANCE.md` records how the mother workspace
 was used for provenance recovery without being published wholesale.
+
+## Release artifact records
+
+The software repository is linked to a staged Zenodo data package containing
+full raw releases, pinned real-model inputs, and a Stage4 source sidecar.
+Final DOI fields are still `TBD` until the Zenodo drafts are created.
+
+See:
+
+```text
+ARTIFACT_LEDGER.md
+RELEASE_ARTIFACTS.json
+docs/release/ZENODO_DATA_STAGING.md
+```

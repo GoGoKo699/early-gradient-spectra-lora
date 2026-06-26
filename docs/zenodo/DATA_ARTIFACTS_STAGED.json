@@ -1,0 +1,39 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2729153,
+      "filename": "releases/stage4_paper_20260622T061351.tar.gz",
+      "sha256": "e1bec75d05b0716b7f0e314c0f18d64fa99875bd07d1e634e31bb1b8c268f2c2"
+    },
+    {
+      "bytes": 16611798,
+      "filename": "releases/transformer_publication_20260622T101458Z.tar.gz",
+      "sha256": "b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3"
+    },
+    {
+      "bytes": 115868168,
+      "filename": "releases/real_lora_publication_20260623T074520Z.tar.gz",
+      "sha256": "4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de"
+    },
+    {
+      "bytes": 474014914,
+      "filename": "inputs/real_lora_validation_inputs_20260623.tar.gz",
+      "sha256": "e152ecb90e09dd79739f02f77dbf688c5a3ac06374b60d319da73e5fe537b9b1"
+    },
+    {
+      "bytes": 3313564,
+      "filename": "stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz",
+      "sha256": "c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708"
+    }
+  ],
+  "created_utc": "20260626T090248Z",
+  "notes": [
+    "The three raw release archives are copied unchanged from Local/releases.",
+    "The real-model input archive is built from Local/inputs/real_lora_validation.",
+    "The Stage4 source sidecar preserves the audited raw archive hash while supplying the missing source snapshot."
+  ],
+  "source_local_folder": "Local",
+  "source_mother_workspace": "Lora_Project",
+  "stage4_source_commit": "e78df5898c949b003dfde4a8ac568465a5188b6d",
+  "zenodo_data_doi": "TBD"
+}

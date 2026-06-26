@@ -11,19 +11,31 @@
       "study": "stage4",
       "filename": "stage4_paper_20260622T061351.tar.gz",
       "sha256": "e1bec75d05b0716b7f0e314c0f18d64fa99875bd07d1e634e31bb1b8c268f2c2",
-      "included_in_git": false
+      "included_in_git": false,
+      "zenodo_data_path": "releases/stage4_paper_20260622T061351.tar.gz",
+      "bytes": 2729153,
+      "zenodo_data_doi": "TBD",
+      "download_url": "TBD"
     },
     {
       "study": "synthetic_transformer",
       "filename": "transformer_publication_20260622T101458Z.tar.gz",
       "sha256": "b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3",
-      "included_in_git": false
+      "included_in_git": false,
+      "zenodo_data_path": "releases/transformer_publication_20260622T101458Z.tar.gz",
+      "bytes": 16611798,
+      "zenodo_data_doi": "TBD",
+      "download_url": "TBD"
     },
     {
       "study": "real_lora",
       "filename": "real_lora_publication_20260623T074520Z.tar.gz",
       "sha256": "4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de",
-      "included_in_git": false
+      "included_in_git": false,
+      "zenodo_data_path": "releases/real_lora_publication_20260623T074520Z.tar.gz",
+      "bytes": 115868168,
+      "zenodo_data_doi": "TBD",
+      "download_url": "TBD"
     }
   ],
   "real_model_input_manifest": {
@@ -41,5 +53,69 @@
     "verification_command": "python Paper/verify_publication_reproducibility.py --scope full",
     "source_date_epoch": 1782123298,
     "ubuntu_apt_snapshot": "20260622T120000Z"
+  },
+  "linked_release_artifacts": {
+    "schema_version": 1,
+    "last_updated_utc": "20260626T100837Z",
+    "software": {
+      "source_folder": "Publication/GitHub",
+      "github_branch": "release/integrate-artifacts",
+      "final_github_tag": "v1.0.0-publication",
+      "final_github_commit": "TBD_AFTER_FINAL_TAG",
+      "zenodo_software_doi": "TBD"
+    },
+    "data": {
+      "source_folder": "Local",
+      "staged_folder": "/home/ubuntu/\u4e0b\u8f7d/Release_Staging/zenodo_data_20260626T090248Z",
+      "zenodo_data_doi": "TBD",
+      "staging_manifest_sha256": "da4b7e4762e596124d4531c09574307b2fec5f457cd7a41956d362c419cfdb52",
+      "artifacts": [
+        {
+          "bytes": 2729153,
+          "filename": "releases/stage4_paper_20260622T061351.tar.gz",
+          "sha256": "e1bec75d05b0716b7f0e314c0f18d64fa99875bd07d1e634e31bb1b8c268f2c2"
+        },
+        {
+          "bytes": 16611798,
+          "filename": "releases/transformer_publication_20260622T101458Z.tar.gz",
+          "sha256": "b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3"
+        },
+        {
+          "bytes": 115868168,
+          "filename": "releases/real_lora_publication_20260623T074520Z.tar.gz",
+          "sha256": "4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de"
+        },
+        {
+          "bytes": 474014914,
+          "filename": "inputs/real_lora_validation_inputs_20260623.tar.gz",
+          "sha256": "e152ecb90e09dd79739f02f77dbf688c5a3ac06374b60d319da73e5fe537b9b1"
+        },
+        {
+          "bytes": 3313564,
+          "filename": "stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz",
+          "sha256": "c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708"
+        }
+      ]
+    },
+    "stage4_source_sidecar": {
+      "source_folder": "Lora_Project",
+      "source_commit": "e78df5898c949b003dfde4a8ac568465a5188b6d",
+      "artifact": {
+        "bytes": 3313564,
+        "filename": "stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz",
+        "sha256": "c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708"
+      },
+      "purpose": "Preserves the audited Stage4 raw release hash while supplying the missing source/validator snapshot."
+    },
+    "real_model_inputs": {
+      "source_folder": "Local/inputs/real_lora_validation",
+      "artifact": {
+        "bytes": 474014914,
+        "filename": "inputs/real_lora_validation_inputs_20260623.tar.gz",
+        "sha256": "e152ecb90e09dd79739f02f77dbf688c5a3ac06374b60d319da73e5fe537b9b1"
+      },
+      "manifest_in_data_record": "manifests/INPUT_MANIFEST.json",
+      "verification_table_in_data_record": "manifests/INPUT_MANIFEST_VERIFICATION.tsv"
+    }
   }
 }
