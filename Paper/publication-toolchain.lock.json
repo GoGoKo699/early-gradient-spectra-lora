@@ -1,9 +1,9 @@
 {
   "artifacts": {
     "paper": {
-      "pages": 9,
+      "pages": 10,
       "path": "paper.pdf",
-      "sha256": "5320c583432685d115559f3bf04ce0777ae2cb06bee739f9159fcb49533b959f"
+      "sha256": "cf1f42ae849e5e5927e9ec707e69118c574915c18583ea2eb0ccb3f3227eb5ac"
     },
     "python_generated": {
       "Paper/figures/alpha_noise_tradeoff.pdf": "47a47678cba935a4e762575b3ec3aeed35e2cf90463205a21f3b9c04f8c750f5",
