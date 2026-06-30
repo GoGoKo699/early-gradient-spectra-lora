@@ -98,7 +98,7 @@ was used for provenance recovery without being published wholesale.
 
 ## Release artifact records
 
-The software repository is linked to the Zenodo data record `10.5281/zenodo.21061917`, which contains the full raw releases, pinned real-model inputs, and a Stage4 source sidecar. The public software release is `v1.0.2-publication` at `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`.
+The software repository is linked to the Zenodo data record `10.5281/zenodo.21061917`, which contains the full raw releases, pinned real-model inputs, and a Stage4 source sidecar. The public software release is `v1.0.3-publication` at `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication`.
 full raw releases, pinned real-model inputs, and a Stage4 source sidecar.
 
 See:
@@ -133,7 +133,7 @@ in the planned Zenodo data record.
 ## Public identifiers
 
 - Repository: `https://github.com/GoGoKo699/early-gradient-spectra-lora`
-- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`
+- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication`
 - Data DOI: `10.5281/zenodo.21061917`
 - Data concept DOI: `10.5281/zenodo.21061916`
 - Data record: `https://zenodo.org/records/21061917`

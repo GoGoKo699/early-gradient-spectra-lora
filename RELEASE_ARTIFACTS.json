@@ -130,8 +130,8 @@
   },
   "public_release": {
     "repository_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora",
-    "release_tag": "v1.0.2-publication",
-    "release_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication",
+    "release_tag": "v1.0.3-publication",
+    "release_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication",
     "software_doi": null,
     "data_doi": "10.5281/zenodo.21061917",
     "data_concept_doi": "10.5281/zenodo.21061916",

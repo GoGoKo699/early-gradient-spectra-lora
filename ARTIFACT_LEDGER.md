@@ -15,7 +15,7 @@ The three local folders used to build the final release have different roles:
 
 | Artifact | Planned public location | Built from | Verification |
 |---|---|---|---|
-| Software and compact evidence | GitHub release `v1.0.2-publication` | `Publication/GitHub` | `sha256sum -c SHA256SUMS.txt`, unit tests, compact evidence checks |
+| Software and compact evidence | GitHub release `v1.0.3-publication` | `Publication/GitHub` | `sha256sum -c SHA256SUMS.txt`, unit tests, compact evidence checks |
 | Manuscript source | Overleaf; optional GitHub `Paper/` mirror | `Publication/Overleaf` | locked publication build / Overleaf compile |
 | Paper PDF | GitHub release and Zenodo software record | `Publication/paper.pdf` | SHA-256 in `RELEASE_ARTIFACTS.json` and `SHA256SUMS.txt` |
 | Full raw releases | Zenodo data DOI `10.5281/zenodo.21061917` | `Local/releases` | archive SHA-256 plus release validators |

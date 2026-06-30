@@ -118,7 +118,7 @@ The real-model publication driver is network-offline after preflight.
 
 The final release is expected to have two persistent records:
 
-- software/code release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`;
+- software/code release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication`;
 - full raw evidence and input-data DOI: `10.5281/zenodo.21061917`.
 
 `RELEASE_ARTIFACTS.json` and `ARTIFACT_LEDGER.md` should be updated with final
@@ -143,7 +143,7 @@ local staged files that should be uploaded to the data record.
 ## Public identifiers
 
 - Repository: `https://github.com/GoGoKo699/early-gradient-spectra-lora`
-- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`
+- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication`
 - Data DOI: `10.5281/zenodo.21061917`
 - Data concept DOI: `10.5281/zenodo.21061916`
 - Data record: `https://zenodo.org/records/21061917`
