@@ -1,6 +1,6 @@
 # Early Gradient Spectra Predict Useful Low-Rank Adaptation
 
-This repository is the reviewer-facing artifact for the anonymous manuscript
+This repository is the public artifact for the paper
 **“Early Gradient Spectra Predict Useful Low-Rank Adaptation.”**
 
 ## Evidence summary

@@ -3,7 +3,7 @@
     "paper": {
       "pages": 10,
       "path": "paper.pdf",
-      "sha256": "cf1f42ae849e5e5927e9ec707e69118c574915c18583ea2eb0ccb3f3227eb5ac"
+      "sha256": "be0942d7840d2e3ea1f2503100c331314d7569a07ed3c7a52eb6b5fb82ec767a"
     },
     "python_generated": {
       "Paper/figures/alpha_noise_tradeoff.pdf": "47a47678cba935a4e762575b3ec3aeed35e2cf90463205a21f3b9c04f8c750f5",
