@@ -3,7 +3,7 @@
   "@type": "SoftwareSourceCode",
   "name": "Early Gradient Spectra Predict Useful Low-Rank Adaptation",
   "description": "Reproducible theory-and-evidence package for activation-whitened early-gradient spectra as diagnostics for useful LoRA rank, with controlled matrix simulations, synthetic-transformer allocation tests, and scoped GPT-2/WikiText-2 validation.",
-  "version": "v1.0.0-publication",
+  "version": "v1.0.2-publication",
   "dateCreated": "2026-06-28",
   "datePublished": "2026-06-28",
   "license": "https://spdx.org/licenses/MIT.html",
@@ -35,5 +35,11 @@
       "@type": "Person",
       "name": "Ruge Lin"
     }
+  ],
+  "codeRepository": "https://github.com/GoGoKo699/early-gradient-spectra-lora",
+  "relatedLink": [
+    "https://zenodo.org/records/21061917",
+    "https://doi.org/10.5281/zenodo.21061917",
+    "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication"
   ]
 }

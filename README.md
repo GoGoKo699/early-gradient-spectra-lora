@@ -98,9 +98,8 @@ was used for provenance recovery without being published wholesale.
 
 ## Release artifact records
 
-The software repository is linked to a staged Zenodo data package containing
+The software repository is linked to the Zenodo data record `10.5281/zenodo.21061917`, which contains the full raw releases, pinned real-model inputs, and a Stage4 source sidecar. The public software release is `v1.0.2-publication` at `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`.
 full raw releases, pinned real-model inputs, and a Stage4 source sidecar.
-Final DOI fields are still `TBD` until the Zenodo drafts are created.
 
 See:
 
@@ -129,3 +128,12 @@ The compact GitHub package contains source code, paper source, paper PDF,
 validation scripts, and compact evidence. Full raw releases and pinned
 GPT-2/WikiText-2 inputs are indexed but stored outside the lightweight checkout
 in the planned Zenodo data record.
+
+
+## Public identifiers
+
+- Repository: `https://github.com/GoGoKo699/early-gradient-spectra-lora`
+- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`
+- Data DOI: `10.5281/zenodo.21061917`
+- Data concept DOI: `10.5281/zenodo.21061916`
+- Data record: `https://zenodo.org/records/21061917`

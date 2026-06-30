@@ -29,4 +29,6 @@ sha256sum -c SHA256SUMS.txt --ignore-missing
 - The three raw release archives are copied unchanged from `Local/releases`.
 - The real-model pinned input archive is built from `Local/inputs/real_lora_validation`.
 - The Stage4 source sidecar is built from the `Lora_Project` Git history at commit `e78df5898c949b003dfde4a8ac568465a5188b6d`.
-- Final Zenodo DOI fields remain `TBD` until the data record is created or reserved.
+- Zenodo data DOI: `10.5281/zenodo.21061917`.
+
+- Zenodo data record: `https://zenodo.org/records/21061917`

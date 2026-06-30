@@ -15,11 +15,11 @@ The three local folders used to build the final release have different roles:
 
 | Artifact | Planned public location | Built from | Verification |
 |---|---|---|---|
-| Software and compact evidence | GitHub tag `v1.0.0-publication`; Zenodo software DOI `TBD` | `Publication/GitHub` | `sha256sum -c SHA256SUMS.txt`, unit tests, compact evidence checks |
+| Software and compact evidence | GitHub release `v1.0.2-publication` | `Publication/GitHub` | `sha256sum -c SHA256SUMS.txt`, unit tests, compact evidence checks |
 | Manuscript source | Overleaf; optional GitHub `Paper/` mirror | `Publication/Overleaf` | locked publication build / Overleaf compile |
 | Paper PDF | GitHub release and Zenodo software record | `Publication/paper.pdf` | SHA-256 in `RELEASE_ARTIFACTS.json` and `SHA256SUMS.txt` |
-| Full raw releases | Zenodo data DOI `TBD` | `Local/releases` | archive SHA-256 plus release validators |
-| Real-model pinned inputs | Zenodo data DOI `TBD` | `Local/inputs/real_lora_validation` | `INPUT_MANIFEST.json` |
+| Full raw releases | Zenodo data DOI `10.5281/zenodo.21061917` | `Local/releases` | archive SHA-256 plus release validators |
+| Real-model pinned inputs | Zenodo data DOI `10.5281/zenodo.21061917` | `Local/inputs/real_lora_validation` | `INPUT_MANIFEST.json` |
 | Provenance notes | GitHub `docs/provenance/` | selected files from `Lora_Project` | source-history/provenance audit |
 
 ## Raw release identities
@@ -67,5 +67,4 @@ Primary artifact identities:
 | `inputs/real_lora_validation_inputs_20260623.tar.gz` | 474014914 | `e152ecb90e09dd79739f02f77dbf688c5a3ac06374b60d319da73e5fe537b9b1` |
 | `stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz` | 3313564 | `c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708` |
 
-The final Zenodo DOI is still `TBD`; after the draft DOI is reserved, update
-this ledger, `RELEASE_ARTIFACTS.json`, `CITATION.cff`, and the manuscript.
+The Zenodo data DOI is `10.5281/zenodo.21061917`. Public source is the GitHub release `v1.0.1-publication`.

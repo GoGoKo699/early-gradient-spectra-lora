@@ -35,5 +35,7 @@
   "source_local_folder": "Local",
   "source_mother_workspace": "Lora_Project",
   "stage4_source_commit": "e78df5898c949b003dfde4a8ac568465a5188b6d",
-  "zenodo_data_doi": "TBD"
+  "zenodo_data_concept_doi": "10.5281/zenodo.21061916",
+  "zenodo_data_doi": "10.5281/zenodo.21061917",
+  "zenodo_data_record_url": "https://zenodo.org/records/21061917"
 }

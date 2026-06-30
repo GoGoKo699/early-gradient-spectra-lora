@@ -4,7 +4,7 @@ title: "Early Gradient Spectra Predict Useful Low-Rank Adaptation"
 type: software
 authors:
   - name: "Ruge Lin"
-version: "v1.0.0-publication"
+version: "v1.0.2-publication"
 date-released: "2026-06-28"
 abstract: >-
   Reproducible theory-and-evidence package for activation-whitened
@@ -25,3 +25,5 @@ keywords:
   - GPT-2
   - WikiText-2
 license: MIT
+repository-code: "https://github.com/GoGoKo699/early-gradient-spectra-lora"
+url: "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication"

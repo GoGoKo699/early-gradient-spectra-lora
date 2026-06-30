@@ -21,5 +21,19 @@
     "GPT-2",
     "WikiText-2"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.21061917",
+      "relation": "isSupplementedBy",
+      "scheme": "doi",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://github.com/GoGoKo699/early-gradient-spectra-lora",
+      "relation": "isDocumentedBy",
+      "scheme": "url",
+      "resource_type": "software"
+    }
+  ]
 }

@@ -27,8 +27,8 @@ WikiText-2; exact-cost LoRA; sign-flip test; reproducible ML artifacts.
 - `RELEASE_ARTIFACTS.json`: machine-readable artifact index.
 - `SHA256SUMS.txt`: checksum manifest for the lightweight package.
 - `evidence/`: compact checked evidence included in the repository.
-- Zenodo software DOI: `TBD`.
-- Zenodo data DOI: `TBD`.
+- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`.
+- Zenodo data DOI: `10.5281/zenodo.21061917`.
 
 ## Claim boundaries
 
@@ -49,8 +49,6 @@ This artifact is meant to support:
 - indexing by machine-learning research agents and language models.
 
 
-## Pending public identifiers
+## Public identifiers
 
-The public GitHub URL and Zenodo DOIs are intentionally omitted from
-machine-readable metadata until those records exist. Human-facing documentation
-may still contain `TBD` placeholders for the planned software and data records.
+The public GitHub URL and Zenodo data DOI are now recorded. The public software release is `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication` and the data DOI is `10.5281/zenodo.21061917`.

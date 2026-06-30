@@ -118,11 +118,11 @@ The real-model publication driver is network-offline after preflight.
 
 The final release is expected to have two persistent records:
 
-- software/code DOI: `TBD`;
-- full raw evidence and input-data DOI: `TBD`.
+- software/code release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`;
+- full raw evidence and input-data DOI: `10.5281/zenodo.21061917`.
 
 `RELEASE_ARTIFACTS.json` and `ARTIFACT_LEDGER.md` should be updated with final
-DOIs before public tagging.
+public identifiers before final packaging. Current public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.1-publication`; current data DOI: `10.5281/zenodo.21061917`.
 
 ## Staged data artifact identities
 
@@ -136,5 +136,14 @@ The staged Zenodo data package created from `Local` contains:
 | `inputs/real_lora_validation_inputs_20260623.tar.gz` | 474014914 | `e152ecb90e09dd79739f02f77dbf688c5a3ac06374b60d319da73e5fe537b9b1` |
 | `stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz` | 3313564 | `c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708` |
 
-Use the final Zenodo DOI once available. Until then, these hashes identify the
+Use the Zenodo data DOI `10.5281/zenodo.21061917`. These hashes identify the
 local staged files that should be uploaded to the data record.
+
+
+## Public identifiers
+
+- Repository: `https://github.com/GoGoKo699/early-gradient-spectra-lora`
+- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication`
+- Data DOI: `10.5281/zenodo.21061917`
+- Data concept DOI: `10.5281/zenodo.21061916`
+- Data record: `https://zenodo.org/records/21061917`

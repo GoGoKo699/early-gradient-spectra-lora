@@ -14,8 +14,8 @@
       "included_in_git": false,
       "zenodo_data_path": "releases/stage4_paper_20260622T061351.tar.gz",
       "bytes": 2729153,
-      "zenodo_data_doi": "TBD",
-      "download_url": "TBD"
+      "zenodo_data_doi": "10.5281/zenodo.21061917",
+      "download_url": "https://zenodo.org/records/21061917/files/zenodo_data_20260626T090248Z.tar?download=1"
     },
     {
       "study": "synthetic_transformer",
@@ -24,8 +24,8 @@
       "included_in_git": false,
       "zenodo_data_path": "releases/transformer_publication_20260622T101458Z.tar.gz",
       "bytes": 16611798,
-      "zenodo_data_doi": "TBD",
-      "download_url": "TBD"
+      "zenodo_data_doi": "10.5281/zenodo.21061917",
+      "download_url": "https://zenodo.org/records/21061917/files/zenodo_data_20260626T090248Z.tar?download=1"
     },
     {
       "study": "real_lora",
@@ -34,8 +34,8 @@
       "included_in_git": false,
       "zenodo_data_path": "releases/real_lora_publication_20260623T074520Z.tar.gz",
       "bytes": 115868168,
-      "zenodo_data_doi": "TBD",
-      "download_url": "TBD"
+      "zenodo_data_doi": "10.5281/zenodo.21061917",
+      "download_url": "https://zenodo.org/records/21061917/files/zenodo_data_20260626T090248Z.tar?download=1"
     }
   ],
   "real_model_input_manifest": {
@@ -61,12 +61,12 @@
       "source_folder": "Publication/GitHub",
       "github_branch": "release/integrate-artifacts",
       "final_github_tag": "v1.0.0-publication",
-      "final_github_commit": "TBD_AFTER_FINAL_TAG",
-      "zenodo_software_doi": "TBD"
+      "final_github_commit": "resolved_by_release_tag",
+      "zenodo_software_doi": null
     },
     "data": {
       "source_folder": "Local",
-      "zenodo_data_doi": "TBD",
+      "zenodo_data_doi": "10.5281/zenodo.21061917",
       "staging_manifest_sha256": "da4b7e4762e596124d4531c09574307b2fec5f457cd7a41956d362c419cfdb52",
       "artifacts": [
         {
@@ -96,7 +96,7 @@
         }
       ],
       "staged_artifact": "zenodo_data_20260626T090248Z",
-      "public_location": "TBD"
+      "public_location": "https://zenodo.org/records/21061917"
     },
     "stage4_source_sidecar": {
       "source_folder": "Lora_Project",
@@ -127,5 +127,17 @@
     "software_license": "LICENSE",
     "data_license": "LICENSE-DATA.md",
     "third_party_notices": "THIRD_PARTY_NOTICES.md"
+  },
+  "public_release": {
+    "repository_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora",
+    "release_tag": "v1.0.2-publication",
+    "release_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.2-publication",
+    "software_doi": null,
+    "data_doi": "10.5281/zenodo.21061917",
+    "data_concept_doi": "10.5281/zenodo.21061916",
+    "data_record_url": "https://zenodo.org/records/21061917",
+    "data_tar_download_url": "https://zenodo.org/records/21061917/files/zenodo_data_20260626T090248Z.tar?download=1",
+    "data_sha256_download_url": "https://zenodo.org/records/21061917/files/zenodo_data_20260626T090248Z.tar.sha256?download=1",
+    "commit_identifier": "resolved_by_release_tag"
   }
 }
