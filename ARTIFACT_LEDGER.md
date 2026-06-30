@@ -54,7 +54,7 @@ tagging.
 The current staged Zenodo data folder is:
 
 ```text
-/home/ubuntu/下载/Release_Staging/zenodo_data_20260626T090248Z
+zenodo_data_20260626T090248Z
 ```
 
 Primary artifact identities:

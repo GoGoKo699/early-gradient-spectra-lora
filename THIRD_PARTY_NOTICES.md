@@ -1,21 +1,59 @@
 # Third-party notices
 
-This notice is a release draft. Confirm exact license text and versions before
-public release.
+This project includes code, generated evidence, documentation, and references
+to third-party software, models, datasets, and TeX tooling. This notice is
+intended to identify major upstream resources; verify exact upstream license
+versions before a formal public release.
 
-The project code and evidence interact with or reference the following
-third-party resources:
+## Models and datasets
 
-- GPT-2 model files and tokenizer assets used for the real-model validation.
-- WikiText-2 data used for language-model evaluation.
-- PyTorch and related tensor/autograd/runtime dependencies.
-- Hugging Face Transformers and Datasets tooling.
-- NumPy, pandas, SciPy, Matplotlib, and pytest.
-- LaTeX tooling and venue/style files used for manuscript compilation.
+- **GPT-2 model and tokenizer files.** Used only as checksum-pinned local inputs
+  for the real-model validation. These files are not stored in the lightweight
+  GitHub package. They are indexed by `INPUT_MANIFEST.json` and belong in the
+  large data artifact.
+- **WikiText-2.** Used as checksum-pinned local source/derived text files for
+  validation. These files are not stored in the lightweight GitHub package.
+  They are indexed by `INPUT_MANIFEST.json` and belong in the large data
+  artifact.
 
-The large GPT-2 and WikiText-2 files are not stored in the Git repository. Their
-pinned local copies are verified through `INPUT_MANIFEST.json` and belong in the
-Zenodo data record.
+Third-party model and dataset files remain governed by their upstream licenses
+and terms. The project-generated manifests, tables, and validation outputs do
+not change those upstream terms.
 
-Before public release, replace this draft with a complete notice that lists the
-exact upstream license identifiers and any required attribution text.
+## Software dependencies
+
+Major Python/runtime dependencies include:
+
+- PyTorch
+- Hugging Face Transformers
+- Hugging Face Datasets
+- NumPy
+- pandas
+- SciPy
+- Matplotlib
+- PyYAML
+- pytest
+- threadpoolctl
+- Pillow
+- TeX Live / pdfTeX / LaTeX packages used for manuscript compilation
+
+These dependencies are governed by their own upstream licenses. The lightweight
+package records exact publication-toolchain versions in:
+
+```text
+Paper/requirements-publication.lock.txt
+Paper/publication-toolchain.lock.json
+```
+
+## Project-generated materials
+
+Unless otherwise stated, original code in this repository is released under the
+MIT License. Original generated evidence, compact tables, plots, manifests,
+audit metadata, and documentation authored for this project are released under
+CC BY 4.0; see `LICENSE-DATA.md`.
+
+## Exclusions
+
+This notice does not grant rights to third-party resources beyond their upstream
+terms. It also does not replace the license files for the project code or
+project-generated data/evidence.

@@ -5,7 +5,7 @@ Generated UTC: `20260626T100837Z`
 Staged directory:
 
 ```text
-/home/ubuntu/下载/Release_Staging/zenodo_data_20260626T090248Z
+zenodo_data_20260626T090248Z
 ```
 
 The staged directory passed:

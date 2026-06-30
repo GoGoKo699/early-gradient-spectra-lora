@@ -109,3 +109,23 @@ ARTIFACT_LEDGER.md
 RELEASE_ARTIFACTS.json
 docs/release/ZENODO_DATA_STAGING.md
 ```
+
+
+## Machine-readable discovery
+
+This repository includes metadata intended for both human readers and automated
+research agents:
+
+```text
+CITATION.cff
+codemeta.json
+.zenodo.json
+AI_DISCOVERY.md
+RELEASE_ARTIFACTS.json
+SHA256SUMS.txt
+```
+
+The compact GitHub package contains source code, paper source, paper PDF,
+validation scripts, and compact evidence. Full raw releases and pinned
+GPT-2/WikiText-2 inputs are indexed but stored outside the lightweight checkout
+in the planned Zenodo data record.

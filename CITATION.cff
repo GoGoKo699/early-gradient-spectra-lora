@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite the paper and the software/data releases."
+title: "Early Gradient Spectra Predict Useful Low-Rank Adaptation"
+type: software
+authors:
+  - name: "Ruge Lin"
+version: "v1.0.0-publication"
+date-released: "2026-06-28"
+abstract: >-
+  Reproducible theory-and-evidence package for activation-whitened
+  early-gradient spectra as diagnostics for useful LoRA rank, with controlled
+  matrix simulations, synthetic-transformer allocation tests, and scoped
+  GPT-2/WikiText-2 validation.
+keywords:
+  - LoRA
+  - low-rank adaptation
+  - PEFT
+  - transformer fine-tuning
+  - early gradient spectra
+  - activation whitening
+  - effective rank
+  - useful rank
+  - rank allocation
+  - random matrix theory
+  - GPT-2
+  - WikiText-2
+license: MIT

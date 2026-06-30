@@ -66,7 +66,6 @@
     },
     "data": {
       "source_folder": "Local",
-      "staged_folder": "/home/ubuntu/\u4e0b\u8f7d/Release_Staging/zenodo_data_20260626T090248Z",
       "zenodo_data_doi": "TBD",
       "staging_manifest_sha256": "da4b7e4762e596124d4531c09574307b2fec5f457cd7a41956d362c419cfdb52",
       "artifacts": [
@@ -95,7 +94,9 @@
           "filename": "stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz",
           "sha256": "c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708"
         }
-      ]
+      ],
+      "staged_artifact": "zenodo_data_20260626T090248Z",
+      "public_location": "TBD"
     },
     "stage4_source_sidecar": {
       "source_folder": "Lora_Project",
@@ -117,5 +118,14 @@
       "manifest_in_data_record": "manifests/INPUT_MANIFEST.json",
       "verification_table_in_data_record": "manifests/INPUT_MANIFEST_VERIFICATION.tsv"
     }
+  },
+  "discovery_metadata": {
+    "citation_cff": "CITATION.cff",
+    "codemeta": "codemeta.json",
+    "zenodo_metadata": ".zenodo.json",
+    "ai_discovery_note": "AI_DISCOVERY.md",
+    "software_license": "LICENSE",
+    "data_license": "LICENSE-DATA.md",
+    "third_party_notices": "THIRD_PARTY_NOTICES.md"
   }
 }

@@ -1,0 +1,25 @@
+{
+  "title": "Early Gradient Spectra Predict Useful Low-Rank Adaptation",
+  "upload_type": "software",
+  "description": "Code, paper, compact evidence, and reproducibility scripts for early-gradient spectral diagnostics of useful LoRA rank. The full raw releases and pinned GPT-2/WikiText-2 inputs are distributed separately in the data record.",
+  "creators": [
+    {
+      "name": "Ruge Lin"
+    }
+  ],
+  "keywords": [
+    "LoRA",
+    "low-rank adaptation",
+    "PEFT",
+    "transformer fine-tuning",
+    "early gradient spectra",
+    "activation whitening",
+    "effective rank",
+    "useful rank",
+    "rank allocation",
+    "random matrix theory",
+    "GPT-2",
+    "WikiText-2"
+  ],
+  "license": "MIT"
+}

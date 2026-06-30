@@ -1,0 +1,39 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "Early Gradient Spectra Predict Useful Low-Rank Adaptation",
+  "description": "Reproducible theory-and-evidence package for activation-whitened early-gradient spectra as diagnostics for useful LoRA rank, with controlled matrix simulations, synthetic-transformer allocation tests, and scoped GPT-2/WikiText-2 validation.",
+  "version": "v1.0.0-publication",
+  "dateCreated": "2026-06-28",
+  "datePublished": "2026-06-28",
+  "license": "https://spdx.org/licenses/MIT.html",
+  "programmingLanguage": [
+    "Python",
+    "LaTeX",
+    "Shell"
+  ],
+  "runtimePlatform": [
+    "Python 3.12",
+    "TeX Live 2023"
+  ],
+  "keywords": [
+    "LoRA",
+    "low-rank adaptation",
+    "PEFT",
+    "transformer fine-tuning",
+    "early gradient spectra",
+    "activation-whitened gradients",
+    "effective rank",
+    "useful rank",
+    "rank allocation",
+    "random matrix theory",
+    "GPT-2",
+    "WikiText-2"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Ruge Lin"
+    }
+  ]
+}
