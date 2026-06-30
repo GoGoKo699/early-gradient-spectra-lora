@@ -27,7 +27,7 @@ WikiText-2; exact-cost LoRA; sign-flip test; reproducible ML artifacts.
 - `RELEASE_ARTIFACTS.json`: machine-readable artifact index.
 - `SHA256SUMS.txt`: checksum manifest for the lightweight package.
 - `evidence/`: compact checked evidence included in the repository.
-- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication`.
+- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication`.
 - Zenodo data DOI: `10.5281/zenodo.21061917`.
 
 ## Claim boundaries
@@ -51,4 +51,8 @@ This artifact is meant to support:
 
 ## Public identifiers
 
-The public GitHub URL and Zenodo data DOI are now recorded. The public software release is `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication` and the data DOI is `10.5281/zenodo.21061917`.
+- Repository: `https://github.com/GoGoKo699/early-gradient-spectra-lora`
+- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication`
+- Data DOI: `10.5281/zenodo.21061917`
+- Data concept DOI: `10.5281/zenodo.21061916`
+- Data record: `https://zenodo.org/records/21061917`

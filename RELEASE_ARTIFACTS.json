@@ -60,7 +60,7 @@
     "software": {
       "source_folder": "Publication/GitHub",
       "github_branch": "release/integrate-artifacts",
-      "final_github_tag": "v1.0.0-publication",
+      "final_github_tag": "v1.0.4-publication",
       "final_github_commit": "resolved_by_release_tag",
       "zenodo_software_doi": null
     },
@@ -130,8 +130,8 @@
   },
   "public_release": {
     "repository_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora",
-    "release_tag": "v1.0.3-publication",
-    "release_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.3-publication",
+    "release_tag": "v1.0.4-publication",
+    "release_url": "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication",
     "software_doi": null,
     "data_doi": "10.5281/zenodo.21061917",
     "data_concept_doi": "10.5281/zenodo.21061916",
