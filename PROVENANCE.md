@@ -1,43 +1,39 @@
-# Provenance summary
+# Provenance
 
-This release reconciles three local sources:
+## Current cleanup
 
-- `Publication/GitHub`: the reviewer-facing repository and compact evidence package.
-- `Local`: the large raw releases and pinned offline GPT-2/WikiText-2 inputs.
-- `Lora_Project`: the mother working environment used to recover source-history
-  and correction-provenance information.
+The Markdown cleanup starts from repository commit
+`5bf03dc1c5472b9297208a2df5da8bb44854f5da`.
+All 523 entries in its root checksum manifest passed before edits.
 
-The mother workspace was clean at:
+The cleanup updates documentation, narrows claims, fixes identified code
+defects, and changes report generation. It is not described as a packaging-only
+change. Numerical evidence and existing licenses are preserved.
+[docs/CLEANUP.md](docs/CLEANUP.md) records the completed checks and their limits.
 
-```text
-bbfa459a4ceca34abac2dba3d522eaab970b9f2e
-```
+The earlier manuscript and document-build system are recoverable from Git
+history and [v1.0.4-publication](https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication).
+That tag is a historical artifact, not the version of the current working tree.
 
-The publication-facing repository continues from that scientific source state
-with packaging-only commits. At preflight, `Publication/GitHub` was at:
+## Recorded origin of the historical release
 
-```text
-fdfe5a1b2569e7b4d827530a892c6b34ad68fe81
-```
+The previous release reconciled three author-side folders:
 
-## What each source resolved
+| Recorded source | Role |
+|---|---|
+| `Publication/GitHub` | Repository and compact evidence |
+| `Local` | Large raw releases and pinned offline model/data inputs |
+| `Lora_Project` | Working environment used for provenance recovery |
 
-| Question | Resolved by | Final handling |
-|---|---|---|
-| Where are the full raw releases? | `Local/releases` | Publish on Zenodo data record; reference from `RELEASE_ARTIFACTS.json` |
-| Where are pinned GPT-2/WikiText-2 inputs? | `Local/inputs/real_lora_validation` | Package as Zenodo data companion input archive |
-| Is Stage4 source lost? | `Lora_Project` history | Reference source commit or publish source sidecar/rebuilt archive |
-| Were important fixes uncommitted? | `Lora_Project` Git state | Mother workspace was clean at the recorded HEAD |
-| Are paper PDF copies aligned? | `Publication/paper.pdf` and `Publication/GitHub/paper.pdf` | Same SHA-256 at preflight |
+The recorded scientific source commit was
+`bbfa459a4ceca34abac2dba3d522eaab970b9f2e`.
+The recorded publication preflight commit was
+`fdfe5a1b2569e7b4d827530a892c6b34ad68fe81`.
+These are historical source labels; they do not imply that the present
+filesystem contains those external folders.
 
-## Historical records
-
-Selected records from the mother workspace are copied under:
-
-```text
-docs/provenance/
-docs/provenance/historical/
-```
-
-The mother workspace root `SHA256SUMS.txt` and `PATCH_MANIFEST.json` are
-historical records only. They are not the active release checksum manifest.
+Selected source-history and correction records remain under
+[docs/provenance/](docs/provenance/README.md). Their old paths, build commands,
+and status statements describe earlier checkpoints. Historical checksum and
+patch manifests are not current repository manifests. In particular, a
+historical validation statement is not evidence that this cleanup reran it.

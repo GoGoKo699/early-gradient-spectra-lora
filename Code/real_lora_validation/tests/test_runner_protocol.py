@@ -30,6 +30,7 @@ from run_real_lora_validation import (
     clone_adapter_state,
     named_adapter_parameters,
     calibrate_spectra,
+    evaluate,
     make_loader,
 )
 
@@ -52,6 +53,40 @@ def test_consumed_loader_does_not_change_new_loader_order():
     fresh_a = make_loader(blocks, batch_size=3, shuffle=True, seed=107)
     fresh_b = make_loader(blocks, batch_size=3, shuffle=True, seed=107)
     assert torch.equal(flatten_batches(fresh_a), flatten_batches(fresh_b))
+
+
+def test_evaluation_weights_a_short_final_batch_by_token_count():
+    class MeanTokenLoss(nn.Module):
+        def forward(self, input_ids, labels):
+            return SimpleNamespace(loss=labels[:, 1:].float().mean())
+
+    blocks = torch.tensor([[0, 0, 0], [0, 0, 0], [0, 6, 6]])
+    model = MeanTokenLoss()
+    losses = [
+        evaluate(
+            model,
+            make_loader(blocks, batch_size=size, shuffle=False, seed=1),
+            torch.device("cpu"),
+            eval_batches=3,
+        )
+        for size in (1, 2, 3)
+    ]
+    assert losses == pytest.approx([2.0, 2.0, 2.0])
+
+
+def test_evaluation_respects_batch_limit():
+    class MeanTokenLoss(nn.Module):
+        def forward(self, input_ids, labels):
+            return SimpleNamespace(loss=labels[:, 1:].float().mean())
+
+    blocks = torch.tensor([[0, 1, 1], [0, 1, 1], [0, 6, 6]])
+    loss = evaluate(
+        MeanTokenLoss(),
+        make_loader(blocks, batch_size=2, shuffle=False, seed=1),
+        torch.device("cpu"),
+        eval_batches=1,
+    )
+    assert loss == pytest.approx(1.0)
 
 
 def test_lora_linear_is_zero_update_and_uses_canonical_prefix():

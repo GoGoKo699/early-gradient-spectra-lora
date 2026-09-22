@@ -1,69 +1,69 @@
 # Reproducibility guide
 
-## Publication build lock
+The current research report is [Paper/paper.md](Paper/paper.md). Reading it
+requires no build. These checks have different scopes; passing a cheaper check
+does not establish a more expensive one.
 
-The reviewer-facing PDF build is frozen independently of the experimental
-runtimes. Its release gate is defined by:
+## 1. Check the compact repository
 
-- `.python-version`: CPython 3.12.3;
-- `Paper/requirements-publication.lock.txt`: exact linux/amd64 wheels with
-  SHA-256 hashes, including Matplotlib 3.11.0;
-- `Paper/publication-toolchain.lock.json`: environment constants and expected
-  hashes for every regenerated table, vector figure, and `paper.pdf`;
-- `Dockerfile.publication`: an immutable Ubuntu base, a UTC package snapshot,
-  and pdfTeX 1.40.25;
-- `Paper/verify_publication_reproducibility.py`: two independent clean builds,
-  byte comparisons against each other and the lock, plus a Type 3 font check.
-
-Run the canonical full gate from the clean repository root:
+From the root, with Python 3.12 or later:
 
 ```bash
-docker build --platform linux/amd64 \
-  -f Dockerfile.publication \
-  -t early-gradient-spectra-publication .
+python verify.py
+python -m unittest discover -s tests -v
 ```
 
-The build fails unless all 13 Python-generated artifacts and the nine-page
-manuscript reproduce their committed SHA-256 values. The Ubuntu archive is
-fixed at `20260622T120000Z`; `SOURCE_DATE_EPOCH`, locale, timezone, Matplotlib
-backend/configuration, and Python hash seed are also fixed.
+The verifier needs only the standard library and does not write into evidence
+directories. It checks the root checksum manifest and reconstructs the primary
+compact-evidence comparisons. Its output states the specific checks performed.
+The unit tests exercise verifier failures as well as valid examples.
 
-A local Python-only check is available when CPython 3.12.3 is installed:
+Alternatively, `sha256sum -c SHA256SUMS.txt` checks byte integrity only. The root
+manifest covers maintained repository files except itself; experiment-local
+manifests continue to identify their historical artifacts.
+
+## 2. Run the experiment unit tests
+
+Use a separate Python environment. For the matrix and synthetic-transformer
+suites, install the declared package dependencies and pytest. For the
+real-model **unit tests**, CPU PyTorch is sufficient; full training has a
+separate model/data stack.
 
 ```bash
-python3.12 -m venv .venv-publication
-.venv-publication/bin/python -m pip install --require-hashes \
-  -r Paper/requirements-publication.lock.txt
-.venv-publication/bin/python \
-  Paper/verify_publication_reproducibility.py --scope python
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -r Code/rmt_lora_sim/requirements.txt pytest
+python -m pip install -r Code/transformer/requirements.txt
+make -C Code test
 ```
 
-Ordinary `make -C Paper paper` compiles the committed assets, but byte identity
-is guaranteed only by the locked full gate above. Overleaf uses a rolling TeX
-environment and is intended for source review, not byte-identical PDF output.
+These tests cover numerical helpers, allocation controls, analysis and release
+validation, and runner behavior. They do not retrain GPT-2. For the versions
+and observed test counts in this cleanup, read [the cleanup record](docs/CLEANUP.md).
+The historical GPU environment record is
+[requirements-tested-rocm721.txt](Code/real_lora_validation/requirements-tested-rocm721.txt);
+it is not a complete transitive lockfile.
 
-## Levels of verification
-
-### 1. Manuscript and compact-evidence verification
-
-The repository includes all paper-facing tables, figures, compact aggregates,
-analysis plans, release manifests, and validation code. Start with:
+## 3. Regenerate Markdown tables and figures
 
 ```bash
-sha256sum -c SHA256SUMS.txt
+python -m pip install -r Paper/requirements.txt
+python Paper/make_paper_artifacts.py
 ```
 
-The aggregate evidence is under:
+This renders the committed, previously imported analysis tables into Markdown
+and PNG. It does not revalidate the missing raw releases or rerun experiments.
+Review generated changes before updating the root checksum manifest. Numerical
+tables are the comparison target; plot bytes can vary with plotting versions.
 
-- `evidence/stage4/`
-- `evidence/transformer/`
-- `evidence/real_lora/`
+The old document compiler, PDF, and publication-build lock remain retrievable
+from the historical Git tag. They are not part of the maintained workflow.
 
-### 2. Full raw-release validation
+## 4. Validate full external releases
 
-The full releases are intentionally excluded from Git. Obtain the three
-archives whose names and SHA-256 hashes are listed in
-`RELEASE_ARTIFACTS.json`, extract each archive, then run:
+The full releases are outside Git. Obtain the archives identified by
+[RELEASE_ARTIFACTS.json](RELEASE_ARTIFACTS.json), verify their recorded archive
+hashes, extract them, then run:
 
 ```bash
 PYTHONPATH=Code/rmt_lora_sim \
@@ -82,68 +82,38 @@ python Code/real_lora_validation/scripts/validate_real_lora_publication_release.
   --expected-kind publication
 ```
 
-The transformer and real-model archives contain source runs, recursive checksum
-manifests, frozen code snapshots, environment provenance, analysis plans, and
-aggregate outputs. The current Stage4 archive contains the raw runs, configs,
-runtime versions, manifests, and aggregates but relies on its recorded Git
-revision in this repository for the validator and experiment code.
+The Stage4 validator checks structure, hashes, seed/condition coverage, and
+metadata; it does not independently reproduce every fit. The transformer and
+real-model validators additionally reconstruct their analysis outputs. None of
+these validators reruns training.
 
-### 3. Full reruns
+The Stage4 archive relies on source commit
+`e78df5898c949b003dfde4a8ac568465a5188b6d`; its recorded source sidecar supplies
+the corresponding code. Current-source fixes and old release-source checks are
+different operations. Use the recorded snapshot when reproducing the exact
+historical release.
 
-The matrix and synthetic-transformer experiments can be reconstructed from
-their frozen plans and scripts. The GPT-2 study additionally requires the
-pinned offline GPT-2 and WikiText-2 inputs recorded in
-`Code/real_lora_validation/INPUT_MANIFEST.json` and a compatible GPU runtime.
+The import scripts in `Paper/` validate supplied full releases before updating
+the report-facing tables. Their `--help` output documents path arguments.
+Do not substitute superseded `Code/*/results/released/` tables for the current
+publication aggregates under `evidence/`.
 
-There are two supported ways to restore those inputs.
+## 5. Retrain from the recorded protocols
 
-Route A, rebuild/download the pinned inputs from the repository script:
+Read each experiment's README and frozen analysis plan. GPT-2 training needs
+the pinned model and WikiText-2 inputs in
+[INPUT_MANIFEST.json](Code/real_lora_validation/INPUT_MANIFEST.json), plus a
+compatible PyTorch/model runtime.
 
 ```bash
 python Code/real_lora_validation/scripts/prepare_publication_inputs.py
 ```
 
-Route B, after downloading and extracting the Zenodo data companion artifact as
-`../Local`, copy the verified prepared inputs:
+That preparation may download third-party inputs. The real-model driver runs
+offline after preflight. The recorded data companion is
+[Zenodo 10.5281/zenodo.21061917](https://doi.org/10.5281/zenodo.21061917);
+archive identities are preserved in [ARTIFACT_LEDGER.md](ARTIFACT_LEDGER.md).
 
-```bash
-cp -a ../Local/inputs/real_lora_validation/. \
-  Code/real_lora_validation/
-```
-
-The real-model publication driver is network-offline after preflight.
-
-
-## Linked public artifacts
-
-The final release is expected to have two persistent records:
-
-- software/code release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication`;
-- full raw evidence and input-data DOI: `10.5281/zenodo.21061917`.
-
-`RELEASE_ARTIFACTS.json` and `ARTIFACT_LEDGER.md` should be updated with final
-public identifiers before final packaging. Current public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication`; current data DOI: `10.5281/zenodo.21061917`.
-
-## Staged data artifact identities
-
-The staged Zenodo data package created from `Local` contains:
-
-| Path in Zenodo data record | Bytes | SHA-256 |
-|---|---:|---|
-| `releases/stage4_paper_20260622T061351.tar.gz` | 2729153 | `e1bec75d05b0716b7f0e314c0f18d64fa99875bd07d1e634e31bb1b8c268f2c2` |
-| `releases/transformer_publication_20260622T101458Z.tar.gz` | 16611798 | `b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3` |
-| `releases/real_lora_publication_20260623T074520Z.tar.gz` | 115868168 | `4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de` |
-| `inputs/real_lora_validation_inputs_20260623.tar.gz` | 474014914 | `e152ecb90e09dd79739f02f77dbf688c5a3ac06374b60d319da73e5fe537b9b1` |
-| `stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz` | 3313564 | `c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708` |
-
-Use the Zenodo data DOI `10.5281/zenodo.21061917`. These hashes identify the
-local staged files that should be uploaded to the data record.
-
-
-## Public identifiers
-
-- Repository: `https://github.com/GoGoKo699/early-gradient-spectra-lora`
-- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication`
-- Data DOI: `10.5281/zenodo.21061917`
-- Data concept DOI: `10.5281/zenodo.21061916`
-- Data record: `https://zenodo.org/records/21061917`
+This cleanup did not download those raw archives, independently verify their
+remote availability, or repeat model training. No new release or DOI was
+created.

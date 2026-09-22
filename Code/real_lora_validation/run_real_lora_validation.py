@@ -1065,7 +1065,8 @@ def evaluate(
     eval_batches: int,
 ) -> float:
     model.eval()
-    losses: list[float] = []
+    total_loss = 0.0
+    total_tokens = 0
     for batch_index, batch in enumerate(loader):
         if batch_index >= eval_batches:
             break
@@ -1074,12 +1075,16 @@ def evaluate(
         loss = float(output.loss.detach().cpu().item())
         if not math.isfinite(loss):
             raise RuntimeError(f"non-finite evaluation loss at batch {batch_index}")
-        losses.append(loss)
-    if not losses:
+        # Causal-LM loss averages the shifted targets. A final short batch must
+        # contribute in proportion to its token count, not one full batch.
+        tokens = int(values[:, 1:].numel())
+        total_loss += loss * tokens
+        total_tokens += tokens
+    if total_tokens == 0:
         raise RuntimeError("evaluation loader yielded no batches")
     if torch.cuda.is_available() and device.type == "cuda":
         torch.cuda.synchronize(device)
-    return float(np.mean(losses))
+    return total_loss / total_tokens
 
 
 def train_strategy(

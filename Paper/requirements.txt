@@ -1,0 +1,5 @@
+# Versions used for the Markdown and PNG regeneration sanity check.
+# Research training has separate requirements under Code/.
+matplotlib==3.10.8
+numpy==2.3.5
+pandas==2.2.3

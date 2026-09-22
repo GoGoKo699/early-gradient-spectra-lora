@@ -1,65 +1,20 @@
 # Artifact ledger
 
-This project is distributed as linked software, data, and manuscript artifacts.
-The three local folders used to build the final release have different roles:
+The maintained code, compact evidence, and Markdown research report live in
+this repository. The cleanup preserves the historical raw archive identities;
+it does not create or republish a data artifact.
 
-| Local source folder | Final role | Public destination |
+| Artifact | Location | What is checked locally |
 |---|---|---|
-| `Publication/GitHub` | Code, compact evidence, validators, reproducibility docs, paper mirror | GitHub tag and Zenodo software record |
-| `Publication/Overleaf` | Manuscript source for editing/compilation | Overleaf and optional GitHub `Paper/` mirror |
-| `Publication/paper.pdf` | Final manuscript PDF | GitHub release and Zenodo software record |
-| `Local` | Large raw releases and pinned GPT-2/WikiText-2 inputs | Zenodo data record |
-| `Lora_Project` | Mother workspace used for provenance recovery | Not published wholesale; selected records copied to `docs/provenance/` |
+| Research report | [Paper/paper.md](Paper/paper.md) | Documentation and generated table consistency |
+| Compact evidence | [evidence/](evidence/README.md) | Checksums and primary comparison reconstruction |
+| Experiment code | [Code/](Code/README.md) | Unit tests in a recorded CPU environment |
+| Full raw releases and pinned inputs | [Recorded Zenodo data record](https://doi.org/10.5281/zenodo.21061917) | Archive identities recorded; external archives not downloaded in this cleanup |
+| Historical software release | [v1.0.4-publication](https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication) | Historical reference, not the current cleanup version |
 
-## Public artifacts
+## Recorded companion archive identities
 
-| Artifact | Planned public location | Built from | Verification |
-|---|---|---|---|
-| Software and compact evidence | GitHub release `v1.0.4-publication` | `Publication/GitHub` | `sha256sum -c SHA256SUMS.txt`, unit tests, compact evidence checks |
-| Manuscript source | Overleaf; optional GitHub `Paper/` mirror | `Publication/Overleaf` | locked publication build / Overleaf compile |
-| Paper PDF | GitHub release and Zenodo software record | `Publication/paper.pdf` | SHA-256 in `RELEASE_ARTIFACTS.json` and `SHA256SUMS.txt` |
-| Full raw releases | Zenodo data DOI `10.5281/zenodo.21061917` | `Local/releases` | archive SHA-256 plus release validators |
-| Real-model pinned inputs | Zenodo data DOI `10.5281/zenodo.21061917` | `Local/inputs/real_lora_validation` | `INPUT_MANIFEST.json` |
-| Provenance notes | GitHub `docs/provenance/` | selected files from `Lora_Project` | source-history/provenance audit |
-
-## Raw release identities
-
-| Study | Filename | SHA-256 |
-|---|---|---|
-| Stage4 | `stage4_paper_20260622T061351.tar.gz` | `e1bec75d05b0716b7f0e314c0f18d64fa99875bd07d1e634e31bb1b8c268f2c2` |
-| Synthetic transformer | `transformer_publication_20260622T101458Z.tar.gz` | `b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3` |
-| Real LoRA | `real_lora_publication_20260623T074520Z.tar.gz` | `4368ca32afd32fde04c68e1b889bcba2add57a801d8360db4e99557953c991de` |
-
-## Stage4 source coupling
-
-The current Stage4 raw release is valid as raw evidence but is not fully
-self-contained as a software artifact. It relies on the repository source at
-the recorded Stage4 source commit:
-
-```text
-e78df5898c949b003dfde4a8ac568465a5188b6d
-```
-
-Publication-quality options are:
-
-1. rebuild the Stage4 archive with an internal `code_snapshot/`; or
-2. keep the audited Stage4 archive unchanged and publish a source sidecar, such
-   as `stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz`.
-
-The selected option must be recorded in `RELEASE_ARTIFACTS.json` before final
-tagging.
-
-## Staged Zenodo data package
-
-The current staged Zenodo data folder is:
-
-```text
-zenodo_data_20260626T090248Z
-```
-
-Primary artifact identities:
-
-| Path in Zenodo data record | Bytes | SHA-256 |
+| Path in data artifact | Bytes | SHA-256 |
 |---|---:|---|
 | `releases/stage4_paper_20260622T061351.tar.gz` | 2729153 | `e1bec75d05b0716b7f0e314c0f18d64fa99875bd07d1e634e31bb1b8c268f2c2` |
 | `releases/transformer_publication_20260622T101458Z.tar.gz` | 16611798 | `b1deb63807b04a4cd1032a7152d9664ff4b47929dd68ce99afc4317d500482e3` |
@@ -67,4 +22,11 @@ Primary artifact identities:
 | `inputs/real_lora_validation_inputs_20260623.tar.gz` | 474014914 | `e152ecb90e09dd79739f02f77dbf688c5a3ac06374b60d319da73e5fe537b9b1` |
 | `stage4_source/stage4_code_snapshot_e78df5898c949b003dfde4a8ac568465a5188b6d.tar.gz` | 3313564 | `c4006d6dcebf9a95ff7a7136c7eac3a2203b92a389709c072010819ddb032708` |
 
-The Zenodo data DOI is `10.5281/zenodo.21061917`. Public source is the GitHub release `v1.0.4-publication`.
+The Stage4 source sidecar is associated with source commit
+`e78df5898c949b003dfde4a8ac568465a5188b6d`. It supplies the code omitted from
+the original Stage4 raw archive while preserving that archive's identity.
+
+[RELEASE_ARTIFACTS.json](RELEASE_ARTIFACTS.json) retains machine-readable hashes,
+input-manifest identity, external URLs, historical build metadata, and the
+current report path. Old build paths under `historical_publication` are
+historical records; those files are no longer required in the working tree.

@@ -1,0 +1,16 @@
+# Superseded: whitening rows
+
+These are historical pre-control summaries, retained for traceability. They are **not current research evidence**: random-stream and realized-cost controls were incomplete, and nested budgets are not independent runs. The current report uses the corrected ten-run release.
+
+| Rule | Whitening | Mean loss Δ | Wins / 13 | Low-budget mean loss Δ | Low-budget wins / 8 | Mean accuracy Δ |
+| --- | --- | --- | --- | --- | --- | --- |
+| soft dimension | full | -0.2203 | 10 | -0.2995 | 5 | +0.0400 |
+| soft dimension | none | -0.2105 | 12 | -0.2720 | 7 | +0.0445 |
+| marginal gain soft | none | -0.2080 | 10 | -0.2615 | 5 | +0.0466 |
+| soft dimension | diag | -0.1856 | 10 | -0.2394 | 6 | +0.0378 |
+| effective rank | full | -0.1766 | 12 | -0.2520 | 7 | +0.0427 |
+| gradient norm | -- | -0.1559 | 10 | -0.2201 | 5 | +0.0247 |
+| marginal gain soft | diag | -0.1555 | 9 | -0.1961 | 5 | +0.0365 |
+| effective rank | diag | -0.1282 | 13 | -0.1466 | 8 | +0.0358 |
+| marginal gain soft | full | -0.0658 | 7 | -0.0695 | 5 | +0.0083 |
+| effective rank | none | -0.0105 | 10 | +0.0589 | 5 | -0.0047 |

@@ -1,20 +1,16 @@
 {
   "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
   "@type": "SoftwareSourceCode",
-  "name": "Early Gradient Spectra Predict Useful Low-Rank Adaptation",
-  "description": "Reproducible theory-and-evidence package for activation-whitened early-gradient spectra as diagnostics for useful LoRA rank, with controlled matrix simulations, synthetic-transformer allocation tests, and scoped GPT-2/WikiText-2 validation.",
-  "version": "v1.0.4-publication",
+  "name": "Early gradient spectra for low-rank adaptation",
+  "description": "Research checkpoint for early-gradient rank diagnostics, with a classical linear derivation, synthetic associations, mixed allocation evidence, a Markdown report, and compact-evidence checks.",
   "dateCreated": "2026-06-28",
-  "datePublished": "2026-06-28",
   "license": "https://spdx.org/licenses/MIT.html",
   "programmingLanguage": [
     "Python",
-    "LaTeX",
     "Shell"
   ],
   "runtimePlatform": [
-    "Python 3.12",
-    "TeX Live 2023"
+    "Python 3.12"
   ],
   "keywords": [
     "LoRA",
@@ -41,5 +37,6 @@
     "https://zenodo.org/records/21061917",
     "https://doi.org/10.5281/zenodo.21061917",
     "https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication"
-  ]
+  ],
+  "dateModified": "2026-09-22"
 }

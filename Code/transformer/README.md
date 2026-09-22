@@ -150,10 +150,9 @@ state or pollute Git provenance with cache files.
 
 For each candidate transformer module site `j`, the package estimates
 
-\[
-\widehat M_{j,\lambda}
-= -\widehat G_j(\widehat C_j+\lambda I)^{-1/2},
-\]
+```text
+M_hat(j, λ) = −G_hat(j) @ (C_hat(j) + λ I)^(−1/2)
+```
 
 where `G_j` is the early full gradient and `C_j` is the module input covariance.
 It computes:

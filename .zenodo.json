@@ -1,7 +1,7 @@
 {
-  "title": "Early Gradient Spectra Predict Useful Low-Rank Adaptation",
+  "title": "Early gradient spectra for low-rank adaptation",
   "upload_type": "software",
-  "description": "Code, paper, compact evidence, and reproducibility scripts for early-gradient spectral diagnostics of useful LoRA rank. The full raw releases and pinned GPT-2/WikiText-2 inputs are distributed separately in the data record.",
+  "description": "Research code, Markdown report, compact evidence, and verification scripts for restricted early-gradient rank diagnostics. The synthetic-transformer primary result is null; the small GPT-2 gain reverses in a module-family boundary suite. Historical full raw releases and pinned inputs are distributed separately.",
   "creators": [
     {
       "name": "Ruge Lin"
