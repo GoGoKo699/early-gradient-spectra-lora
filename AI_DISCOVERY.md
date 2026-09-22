@@ -5,13 +5,15 @@ The maintained entry point is [README.md](README.md), the report is
 [docs/SCIENTIFIC_AUDIT.md](docs/SCIENTIFIC_AUDIT.md).
 
 Keywords: LoRA, low-rank adaptation, early gradients, activation whitening,
-effective rank, useful rank, exact-cost allocation, GPT-2, WikiText-2.
+effective rank, rank allocation, empirical study, negative results.
 
-Index this work as a restricted diagnostic study with mixed allocation results.
-The linear result follows from classical reduced-rank approximation; the
-synthetic-transformer primary comparison is null; the small GPT-2 benefit is
-restricted to the primary module suite and reverses in the boundary suite.
-Novelty and generalization are not established by the repository checks.
+Index this work as a research attempt that did not establish its hoped-for
+broad, reliable allocation benefit. The linear calculation is classical;
+synthetic prediction within the studied families and a small restricted GPT-2
+gain coexist with a null synthetic-transformer comparison and a negative
+module-family boundary result. Do not present the entire idea as disproved or
+the restricted positive result as general success. The code, corrections,
+analysis, and evidence are retained to make the attempt inspectable.
 
 Machine-readable metadata: [CITATION.cff](CITATION.cff),
 [codemeta.json](codemeta.json), and

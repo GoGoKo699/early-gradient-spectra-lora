@@ -69,3 +69,20 @@ prospective preregistration, or novelty.
 Current evidence is internally consistent within the tested scope. A precise
 new contribution relative to existing gradient/activation-based LoRA work and
 generalization beyond the restricted protocols remain research questions.
+
+## Public framing follow-up
+
+The author requested that the unmet expectation and the good-faith nature of
+the attempt be stated plainly. The README and report now do so, while preserving
+the valid restricted findings. Citation, discovery, and archive metadata use
+the same framing. This wording update changes no numerical evidence or code.
+
+The repository name `early-gradient-spectra-lora` remains a neutral subject
+label. Suggested GitHub About description:
+
+> An attempt to guide LoRA rank allocation using early-gradient spectra. It did not establish the hoped-for broad, reliable benefit. Code, analyses, and positive, null, and negative results are preserved.
+
+Suggested GitHub topics: `lora`, `low-rank-adaptation`, `peft`, `gradient-spectra`, `rank-allocation`, `activation-whitening`, `effective-rank`, `empirical-study`, `negative-results`.
+
+These About settings are separate from the committed file metadata. The text
+above records the intended settings; committing this file does not apply them.

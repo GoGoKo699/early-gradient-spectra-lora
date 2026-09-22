@@ -5,10 +5,23 @@ capacity a task needs? This research repository studies that question in a
 linear model, controlled matrix simulations, synthetic transformers, and one
 GPT-2/WikiText-2 protocol.
 
-**Current status: an audited research checkpoint, with mixed empirical results.**
-The linear calculation is a consequence of classical reduced-rank
-approximation. The experiments support a restricted diagnostic; they do not
-establish a generally superior LoRA allocator or settle publication novelty.
+**Outcome: this attempt did not establish the hoped-for broad, reliable benefit.**
+
+The aim was to turn early-gradient spectra into a useful guide for LoRA rank
+allocation. The evidence fell short of that broader expectation: the primary
+synthetic-transformer comparison showed no demonstrated advantage, and a small
+GPT-2 gain reversed when the eligible module families changed. The linear
+calculation remains valid as a consequence of classical reduced-rank
+approximation, and the matrix simulations support prediction within their
+constructed families. These findings do not establish a generally superior
+allocator or a distinct new theoretical contribution.
+
+This repository records a good-faith research attempt, including the
+corrections and results that did not meet expectations. The code, analysis,
+and experimental evidence remain public so others can inspect what was tried,
+understand its limitations, and build on it. The broader goal was not achieved
+by this study; the underlying idea has not been proved impossible.
+
 All maintained research documents and generated tables are Markdown. No
 document compilation is required.
 
