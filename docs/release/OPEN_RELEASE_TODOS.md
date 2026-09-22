@@ -1,16 +1,17 @@
-# Open release TODOs
+# Remaining release decisions
 
-These items must be closed before public release or artifact submission:
+The earlier release already selected MIT for code and CC BY 4.0 for original
+evidence/documentation, added citation metadata, and recorded a Stage4 source
+sidecar and data DOI. Those are no longer open setup tasks.
 
-- Select and add the final code license in `LICENSE`.
-- Select and add the final data/evidence license in `LICENSE-DATA.md`.
-- Add `CITATION.cff` with final author, title, version, and DOI metadata.
-- Add `THIRD_PARTY_NOTICES.md` covering GPT-2, WikiText-2, PyTorch,
-  Transformers, datasets, NumPy, pandas, SciPy, and bundled TeX/style files.
-- Decide the Stage4 strategy: rebuild archive with `code_snapshot/` or publish
-  a source sidecar.
-- Apply the transformer scalar-canonicalization patch or pin pandas/numpy
-  exactly in the validator environment.
-- Insert final Zenodo software and data DOIs.
-- Rebuild or re-export the final manuscript after wording edits.
-- Run the Docker publication gate in a Docker-capable environment.
+Before declaring a new research release:
+
+- Resolve the scientific positioning and follow-up questions in
+  [the scientific audit](../SCIENTIFIC_AUDIT.md).
+- Repeat any full raw-release validation required for that release, recording
+  exact source/environment versions and separating it from compact checks.
+- Verify external data availability and applicable third-party terms.
+- Choose a new version/tag and update citation metadata for the actual release.
+  No new version or software DOI is assigned by this cleanup.
+
+The research report is Markdown and needs no compilation gate.

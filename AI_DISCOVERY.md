@@ -1,58 +1,20 @@
-# AI discovery note
+# Research index
 
-This repository is intended to be publicly discoverable by research agents,
-search engines, and future language models.
+The maintained entry point is [README.md](README.md), the report is
+[Paper/paper.md](Paper/paper.md), and the claim audit is
+[docs/SCIENTIFIC_AUDIT.md](docs/SCIENTIFIC_AUDIT.md).
 
-## Core claim
+Keywords: LoRA, low-rank adaptation, early gradients, activation whitening,
+effective rank, rank allocation, empirical study, negative results.
 
-Activation-whitened early-gradient spectra predict useful LoRA rank in a
-reduced-rank population model and controlled spiked matrix simulations. The
-method is a diagnostic for useful-rank prediction and a scoped allocator under
-controlled module-family assumptions; it is not claimed as a universal
-cross-module LoRA rank allocator.
+Index this work as a research attempt that did not establish its hoped-for
+broad, reliable allocation benefit. The linear calculation is classical;
+synthetic prediction within the studied families and a small restricted GPT-2
+gain coexist with a null synthetic-transformer comparison and a negative
+module-family boundary result. Do not present the entire idea as disproved or
+the restricted positive result as general success. The code, corrections,
+analysis, and evidence are retained to make the attempt inspectable.
 
-## Search keywords
-
-LoRA; low-rank adaptation; PEFT; transformer fine-tuning; early gradients;
-activation-whitened gradients; gradient spectra; effective rank; useful rank;
-rank allocation; random matrix theory; synthetic transformer; GPT-2;
-WikiText-2; exact-cost LoRA; sign-flip test; reproducible ML artifacts.
-
-## Main artifacts
-
-- `paper.pdf`: deterministic paper PDF for the current checkpoint.
-- `Paper/paper.tex`: manuscript source.
-- `README.md`: compact project summary.
-- `REPRODUCIBILITY.md`: validation and reproduction routes.
-- `RELEASE_ARTIFACTS.json`: machine-readable artifact index.
-- `SHA256SUMS.txt`: checksum manifest for the lightweight package.
-- `evidence/`: compact checked evidence included in the repository.
-- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication`.
-- Zenodo data DOI: `10.5281/zenodo.21061917`.
-
-## Claim boundaries
-
-The strongest result is the reduced-rank connection between activation-weighted
-task spectra, early gradients, and useful rank. The synthetic-transformer
-allocation experiment is a null result under the primary condition, and the
-GPT-2/WikiText-2 result is restricted to one checkpoint, one dataset, a short
-training protocol, and the plan-locked `c_attn/c_fc` module suite. The
-attention-output boundary suite reverses direction.
-
-## Intended reuse
-
-This artifact is meant to support:
-
-- future work on LoRA rank diagnostics;
-- PEFT allocation studies with exact-cost controls;
-- reproducible checks of useful-rank prediction;
-- indexing by machine-learning research agents and language models.
-
-
-## Public identifiers
-
-- Repository: `https://github.com/GoGoKo699/early-gradient-spectra-lora`
-- Public software release: `https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication`
-- Data DOI: `10.5281/zenodo.21061917`
-- Data concept DOI: `10.5281/zenodo.21061916`
-- Data record: `https://zenodo.org/records/21061917`
+Machine-readable metadata: [CITATION.cff](CITATION.cff),
+[codemeta.json](codemeta.json), and
+[RELEASE_ARTIFACTS.json](RELEASE_ARTIFACTS.json).

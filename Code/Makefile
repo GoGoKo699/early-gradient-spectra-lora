@@ -1,7 +1,4 @@
-.PHONY: stage4-to-paper stage4-release-to-paper transformer-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer smoke-transformer-scaling smoke-transformer-publication transformer-publication real-lora-to-paper paper-artifacts paper clean-paper
-
-SOURCE_DATE_EPOCH ?= 1782123298
-PDF_ENV = SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) FORCE_SOURCE_DATE=1
+.PHONY: stage4-to-paper stage4-release-to-paper transformer-to-paper test test-transformer test-rmt test-real smoke-rmt smoke-transformer smoke-transformer-scaling smoke-transformer-publication transformer-publication real-lora-to-paper paper-artifacts paper report report-artifacts
 
 RMT_SMOKE_CFG = configs/smoke
 
@@ -46,13 +43,14 @@ transformer-to-paper:
 real-lora-to-paper:
 	cd ../Paper && python3 import_real_lora_results.py
 
-paper-artifacts:
+# Regenerate readable artifacts from committed, validated CSV inputs.
+report-artifacts:
 	cd ../Paper && python3 make_paper_artifacts.py
 
-paper: stage4-to-paper transformer-to-paper real-lora-to-paper paper-artifacts
-	cd ../Paper && $(PDF_ENV) pdflatex -interaction=nonstopmode -halt-on-error paper.tex
-	cd ../Paper && $(PDF_ENV) pdflatex -interaction=nonstopmode -halt-on-error paper.tex
-	cp ../Paper/paper.pdf ../paper.pdf
+# Compatibility aliases keep existing automation useful without a compiler.
+paper-artifacts: report-artifacts
 
-clean-paper:
-	rm -f ../Paper/*.aux ../Paper/*.log ../Paper/*.out ../Paper/*.toc ../Paper/paper.pdf
+report: report-artifacts
+	@echo "Research report: ../Paper/paper.md"
+
+paper: report

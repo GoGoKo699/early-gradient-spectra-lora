@@ -11,16 +11,6 @@ Paper/.matplotlib-cache/
 *.log
 *.tmp
 
-# LaTeX build products (the top-level paper.pdf remains tracked)
-*.aux
-*.out
-*.toc
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-# In-tree manuscript build copy; the release artifact is /paper.pdf
-/Paper/paper.pdf
-
 # Real-model local source runs and packaged smoke/publication releases
 /Code/real_lora_validation/real_lora_runs/
 /Code/real_lora_validation/runs/

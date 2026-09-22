@@ -383,7 +383,7 @@ def publish(run_root: Path, aggregates: dict, all_run_dirs: dict, context: dict,
     write_checksums(evidence_root)
     report_lines += [
         "## Paper follow-up", "",
-        "The generated LaTeX table rows have been refreshed. The prose in `Paper/paper.tex` contains hard-coded numerical claims and must be checked against these corrected values before submission.", "",
+        "These historical correction results are separate from the current frozen release. The Markdown report in `Paper/paper.md` must be checked against the current imported release before changing its numerical claims.", "",
     ]
     report_path = PROJECT / "EFFECTIVE_RANK_CORRECTION_RESULTS.md"
     report_path.write_text("\n".join(report_lines), encoding="utf-8")
@@ -407,8 +407,8 @@ def make_bundle(run_root: Path, report_path: Path) -> Path:
             RESULTS / "released",
             RESULTS / "archive_raw_singular_value_effective_rank",
             RESULTS / "corrected_full_runs" / run_root.name,
-            PROJECT / "Paper/tables/generated/real_lora_rows.tex",
-            PROJECT / "Paper/tables/generated/real_lora_pairwise_rows.tex",
+            PROJECT / "Paper/tables/generated/real_lora_rows.md",
+            PROJECT / "Paper/tables/generated/real_lora_pairwise_rows.md",
             PROJECT / "Paper/tables/real_lora",
             ROOT / "run_real_lora_validation.py",
             ROOT / "spectral_metrics.py",

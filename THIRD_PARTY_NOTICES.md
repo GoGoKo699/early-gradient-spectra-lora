@@ -1,7 +1,7 @@
 # Third-party notices
 
 This project includes code, generated evidence, documentation, and references
-to third-party software, models, datasets, and TeX tooling. This notice is
+to third-party software, models, and datasets. This notice is
 intended to identify major upstream resources; verify exact upstream license
 versions before a formal public release.
 
@@ -35,15 +35,11 @@ Major Python/runtime dependencies include:
 - pytest
 - threadpoolctl
 - Pillow
-- TeX Live / pdfTeX / LaTeX packages used for manuscript compilation
 
-These dependencies are governed by their own upstream licenses. The lightweight
-package records exact publication-toolchain versions in:
-
-```text
-Paper/requirements-publication.lock.txt
-Paper/publication-toolchain.lock.json
-```
+These dependencies are governed by their own upstream licenses. Experimental
+dependencies are recorded in each code subpackage; report plotting dependencies
+are in `Paper/requirements.txt`. Historical release environments remain recorded
+in their provenance files and Git history.
 
 ## Project-generated materials
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Regenerate paper-facing tables and vector figures from released CSV artifacts.
+"""Regenerate Markdown tables and PNG figures from released CSV artifacts.
 
 Run from the clean package ``Paper/`` directory:
 
     python3 make_paper_artifacts.py
 
-The script is intentionally deterministic and uses only files shipped in this
-repository.  It also forces Matplotlib PDF/PS output to Type 42 fonts so the
-compiled paper avoids Type 3 fonts.
+The script uses only files shipped in this repository and validates the current
+imported evidence before writing. Exact PNG bytes can vary with plotting-library
+versions; the source data and Markdown values are the reproducibility targets.
 """
 from __future__ import annotations
 
@@ -22,10 +22,9 @@ import sys
 import matplotlib as mpl
 
 # Ignore user/site Matplotlib configuration and force a headless backend. The
-# exact Matplotlib wheel and its bundled fonts are checksum-locked separately.
+# bundled fonts are sufficient; no external typesetting engine is needed.
 mpl.use("Agg")
 mpl.rcdefaults()
-mpl.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42})
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -82,7 +81,7 @@ TRANSFORMER_TASK_DISPLAY = {
 }
 TRANSFORMER_SCALING_DISPLAY = {
     "fixed_update_scale": r"Fixed update scale",
-    "standard": r"Standard $\alpha/r$",
+    "standard": "Standard α/r",
     "rslora": r"rsLoRA",
 }
 TRANSFORMER_PREDICTOR_DISPLAY = {
@@ -112,8 +111,8 @@ REAL_LORA_OUTPUT_FILES = {
     "spectral_seeds": "spectral_seed_deltas.csv",
 }
 REAL_LORA_SUITE_DISPLAY = {
-    "cattn_cfc": r"$c_{attn},c_{fc}$",
-    "attnproj": r"$+a_{proj}$",
+    "cattn_cfc": "c_attn, c_fc",
+    "attnproj": "+ attn.c_proj",
 }
 REAL_LORA_STRATEGY_DISPLAY = {
     "spectral_effective": "spectral effective",
@@ -131,7 +130,6 @@ REAL_LORA_STRATEGY_ORDER = (
     "gradient_norm",
     "fim_gradient_variance",
 )
-ROW_END = r" \\"
 
 
 def _sha256(path: Path) -> str:
@@ -147,14 +145,14 @@ def _ensure_dirs() -> None:
     FIGURES.mkdir(parents=True, exist_ok=True)
 
 
-def _tex_escape(text: object) -> str:
-    s = str(text)
-    # Keep math symbols inserted by this script untouched; escape table text only.
-    return (
-        s.replace("%", r"\%")
-        .replace("_", r"\_")
-        .replace("&", r"\&")
-    )
+def _markdown_row(*cells: object) -> str:
+    """Render one row without an optional table-formatting dependency."""
+    return "| " + " | ".join(str(cell).replace("|", "&#124;").replace("\n", " ") for cell in cells) + " |"
+
+
+def _write_table(path: Path, headers: tuple[str, ...], rows: list[str]) -> None:
+    text = _markdown_row(*headers) + "\n" + _markdown_row(*(["---"] * len(headers)))
+    _write(path, text + "\n" + "\n".join(rows) + "\n")
 
 
 def _fmt(x: float, digits: int = 4, signed: bool = False) -> str:
@@ -171,19 +169,6 @@ def _sem(series: pd.Series) -> float:
 
 
 def _write(path: Path, text: str) -> None:
-    r"""Write generated artifacts.
-
-    LaTeX tabular bodies are input inside a live ``tabular`` environment.
-    Some TeX installations do not accept a booktabs rule immediately after an
-    ``\input`` file that ends with ``\\``.  For generated row files, leave
-    the final row terminator to the caller (``\input{...}\\``) while keeping
-    interior row terminators inside the file.
-    """
-    if path.suffix == ".tex" and path.parent == GENERATED:
-        lines = text.rstrip("\n").splitlines()
-        if lines:
-            lines[-1] = re.sub(r"\s*\\\\\s*$", "", lines[-1])
-            text = "\n".join(lines) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
 
@@ -203,20 +188,17 @@ def _load_stage4_table() -> pd.DataFrame:
 
 def make_stage4_rows() -> None:
     df = _load_stage4_table()
-    lines: list[str] = []
-    for ci, condition in enumerate(["hard_knee", "sample_limited"]):
-        if ci:
-            lines.append(r"\midrule")
+    rows: list[str] = []
+    for condition in ("hard_knee", "sample_limited"):
         sub = df[df["condition"] == condition].copy()
         sub["target_order"] = sub["target_display"].map({t: i for i, t in enumerate(TARGET_ORDER)})
-        sub = sub.sort_values("target_order")
-        for _, row in sub.iterrows():
-            lines.append(
-                f"{CONDITION_DISPLAY[condition]} & {_tex_escape(row['target_display'])} & "
-                f"{float(row['mean_r2']):.3f} ({float(row['sem_r2']):.3f}) & "
-                f"{float(row['mean_spearman']):.3f} ({float(row['sem_spearman']):.3f}) \\\\" 
-            )
-    _write(GENERATED / "stage4_rows.tex", "\n".join(lines) + "\n")
+        for _, row in sub.sort_values("target_order").iterrows():
+            rows.append(_markdown_row(
+                CONDITION_DISPLAY[condition], row["target_display"],
+                f"{float(row['mean_r2']):.3f} ({float(row['sem_r2']):.3f})",
+                f"{float(row['mean_spearman']):.3f} ({float(row['sem_spearman']):.3f})",
+            ))
+    _write_table(GENERATED / "stage4_rows.md", ("Condition", "Target", "Mean in-sample R² (SEM)", "Mean Spearman ρ (SEM)"), rows)
 
 
 def _load_transformer_publication_tables() -> dict[str, pd.DataFrame]:
@@ -613,133 +595,73 @@ def _load_real_lora_publication_tables() -> dict[str, pd.DataFrame]:
     return frames
 
 
-def _latex_row(*cells: object) -> str:
-    return " & ".join(str(cell) for cell in cells) + ROW_END
+def _interval(low: float, high: float) -> str:
+    return f"[{_fmt(low, 4, signed=True)}, {_fmt(high, 4, signed=True)}]"
 
 
 def make_transformer_publication_rows() -> None:
     frames = _load_transformer_publication_tables()
     primary = frames["primary"].iloc[0]
     by_task = frames["by_task"]
-
-    rows: list[str] = [
-        _latex_row(
-            "Omnibus (equal task weight)",
-            int(primary["n_independent_runs"]),
-            f"${_fmt(primary['mean_loss_delta'], 4, signed=True)}$",
-            f"$[{_fmt(primary['cluster_bootstrap_ci_low'], 4, signed=True)},\\,{_fmt(primary['cluster_bootstrap_ci_high'], 4, signed=True)}]$",
-            f"${_fmt(primary['exact_sign_flip_p_two_sided'], 4)}$",
-            f"${int(primary['run_wins_loss'])}/{int(primary['n_independent_runs'])}$",
-            f"${_fmt(primary['mean_accuracy_delta'], 4, signed=True)}$",
-        )
-    ]
+    rows: list[str] = []
+    analyses = [("Omnibus (equal task weight)", primary)]
     for task in ("associative_recall", "modular"):
-        row = by_task[by_task["task_family"].astype(str).eq(task)].iloc[0]
-        rows.append(
-            _latex_row(
-                TRANSFORMER_TASK_DISPLAY[task],
-                int(row["n_independent_runs"]),
-                f"${_fmt(row['mean_loss_delta'], 4, signed=True)}$",
-                f"$[{_fmt(row['cluster_bootstrap_ci_low'], 4, signed=True)},\\,{_fmt(row['cluster_bootstrap_ci_high'], 4, signed=True)}]$",
-                f"${_fmt(row['exact_sign_flip_p_two_sided'], 4)}$",
-                f"${int(row['run_wins_loss'])}/{int(row['n_independent_runs'])}$",
-                f"${_fmt(row['mean_accuracy_delta'], 4, signed=True)}$",
-            )
-        )
-    _write(GENERATED / "transformer_primary_rows.tex", "\n".join(rows) + "\n")
+        analyses.append((TRANSFORMER_TASK_DISPLAY[task], by_task[by_task["task_family"].astype(str).eq(task)].iloc[0]))
+    for name, row in analyses:
+        rows.append(_markdown_row(name, int(row["n_independent_runs"]),
+            _fmt(row["mean_loss_delta"], 4, signed=True),
+            _interval(row["cluster_bootstrap_ci_low"], row["cluster_bootstrap_ci_high"]),
+            _fmt(row["exact_sign_flip_p_two_sided"], 4),
+            f"{int(row['run_wins_loss'])}/{int(row['n_independent_runs'])}",
+            _fmt(row["mean_accuracy_delta"], 4, signed=True)))
+    _write_table(GENERATED / "transformer_primary_rows.md", ("Analysis", "Runs", "Mean loss Δ", "95% CI", "Exact p", "Runs better", "Mean accuracy Δ"), rows)
 
     scaling = frames["scaling"].copy()
-    scaling["_order"] = scaling["scaling_mode"].map(
-        {"fixed_update_scale": 0, "standard": 1, "rslora": 2}
-    )
-    scaling = scaling.sort_values("_order")
+    scaling["_order"] = scaling["scaling_mode"].map({"fixed_update_scale": 0, "standard": 1, "rslora": 2})
     rows = []
-    for _, row in scaling.iterrows():
+    for _, row in scaling.sort_values("_order").iterrows():
         role = "Primary" if row["analysis_role"] == "confirmatory_primary" else "Exploratory"
-        rows.append(
-            _latex_row(
-                TRANSFORMER_SCALING_DISPLAY[str(row["scaling_mode"])],
-                role,
-                f"${_fmt(row['mean_loss_delta'], 4, signed=True)}$",
-                f"${_fmt(row['exact_sign_flip_p_two_sided'], 4)}$",
-                f"${int(row['run_wins_loss'])}/{int(row['n_independent_runs'])}$",
-                f"${_fmt(row['associative_recall_mean_loss_delta'], 4, signed=True)}$",
-                f"${_fmt(row['modular_mean_loss_delta'], 4, signed=True)}$",
-            )
-        )
-    _write(GENERATED / "transformer_scaling_rows.tex", "\n".join(rows) + "\n")
+        rows.append(_markdown_row(TRANSFORMER_SCALING_DISPLAY[str(row["scaling_mode"])], role,
+            _fmt(row["mean_loss_delta"], 4, signed=True), _fmt(row["exact_sign_flip_p_two_sided"], 4),
+            f"{int(row['run_wins_loss'])}/{int(row['n_independent_runs'])}",
+            _fmt(row["associative_recall_mean_loss_delta"], 4, signed=True),
+            _fmt(row["modular_mean_loss_delta"], 4, signed=True)))
+    _write_table(GENERATED / "transformer_scaling_rows.md", ("Scaling", "Role", "Omnibus loss Δ", "Exact p", "Runs better", "Associative Δ", "Modular Δ"), rows)
 
     site = frames["site"].copy()
-    site["_task_order"] = site["task_family"].map(
-        {"associative_recall": 0, "modular": 1}
-    )
-    site["_predictor_order"] = site["predictor"].map(
-        {"effective_rank": 0, "soft_dimension": 1}
-    )
-    site = site.sort_values(["_task_order", "_predictor_order"])
+    site["_task_order"] = site["task_family"].map({"associative_recall": 0, "modular": 1})
+    site["_predictor_order"] = site["predictor"].map({"effective_rank": 0, "soft_dimension": 1})
     rows = []
-    previous_task: str | None = None
-    for _, row in site.iterrows():
-        task = str(row["task_family"])
-        if previous_task is not None and task != previous_task:
-            rows.append(r"\midrule")
-        rows.append(
-            _latex_row(
-                TRANSFORMER_TASK_DISPLAY[task],
-                TRANSFORMER_PREDICTOR_DISPLAY[str(row["predictor"])],
-                f"${_fmt(row['mean_spearman'], 3, signed=True)}$",
-                f"${_fmt(row['sem_spearman'], 3)}$",
-            )
-        )
-        previous_task = task
-    _write(GENERATED / "transformer_sitewise_rows.tex", "\n".join(rows) + "\n")
+    for _, row in site.sort_values(["_task_order", "_predictor_order"]).iterrows():
+        rows.append(_markdown_row(TRANSFORMER_TASK_DISPLAY[str(row["task_family"])],
+            TRANSFORMER_PREDICTOR_DISPLAY[str(row["predictor"])],
+            _fmt(row["mean_spearman"], 3, signed=True), _fmt(row["sem_spearman"], 3)))
+    _write_table(GENERATED / "transformer_sitewise_rows.md", ("Task", "Predictor", "Mean Spearman ρ", "SEM"), rows)
 
 
 def make_real_lora_publication_rows() -> None:
     frames = _load_real_lora_publication_tables()
-    summary = frames["summary"].copy()
-    analysis = frames["analysis"].copy()
+    summary, analysis = frames["summary"], frames["analysis"]
     rows: list[str] = []
-    for suite_index, suite in enumerate(("cattn_cfc", "attnproj")):
-        if suite_index:
-            rows.append(r"\midrule")
+    for suite in ("cattn_cfc", "attnproj"):
         for strategy in REAL_LORA_STRATEGY_ORDER:
-            srow = summary[
-                summary["suite_id"].astype(str).eq(suite)
-                & summary["strategy"].astype(str).eq(strategy)
-            ]
-            if len(srow) != 1:
+            selection = summary[summary["suite_id"].astype(str).eq(suite) & summary["strategy"].astype(str).eq(strategy)]
+            if len(selection) != 1:
                 raise ValueError(f"missing real-model summary row: {suite}/{strategy}")
-            srow = srow.iloc[0]
+            srow = selection.iloc[0]
             if strategy == "uniform_r4":
-                delta = "$0$ (reference)"
-                interval = "--"
-                wins = "--"
+                delta, interval, wins = "0 (reference)", "—", "—"
             else:
-                arow = analysis[
-                    analysis["suite_id"].astype(str).eq(suite)
-                    & analysis["candidate_strategy"].astype(str).eq(strategy)
-                ]
-                if len(arow) != 1:
+                selection = analysis[analysis["suite_id"].astype(str).eq(suite) & analysis["candidate_strategy"].astype(str).eq(strategy)]
+                if len(selection) != 1:
                     raise ValueError(f"missing real-model analysis row: {suite}/{strategy}")
-                arow = arow.iloc[0]
-                delta = f"${_fmt(arow['mean_loss_delta'], 4, signed=True)}$"
-                interval = (
-                    f"$[{_fmt(arow['bootstrap_ci_low'], 4, signed=True)},\\,"
-                    f"{_fmt(arow['bootstrap_ci_high'], 4, signed=True)}]$"
-                )
-                wins = f"${int(arow['wins'])}/{int(arow['n_independent_runs'])}$"
-            rows.append(
-                _latex_row(
-                    REAL_LORA_SUITE_DISPLAY[suite],
-                    REAL_LORA_STRATEGY_DISPLAY[strategy],
-                    f"{_fmt(srow['mean_final_val_loss'], 4)} ({_fmt(srow['sem_final_val_loss'], 4)})",
-                    delta,
-                    interval,
-                    wins,
-                )
-            )
-    _write(GENERATED / "real_lora_rows.tex", "\n".join(rows) + "\n")
+                arow = selection.iloc[0]
+                delta = _fmt(arow["mean_loss_delta"], 4, signed=True)
+                interval = _interval(arow["bootstrap_ci_low"], arow["bootstrap_ci_high"])
+                wins = f"{int(arow['wins'])}/{int(arow['n_independent_runs'])}"
+            rows.append(_markdown_row(REAL_LORA_SUITE_DISPLAY[suite], REAL_LORA_STRATEGY_DISPLAY[strategy],
+                f"{_fmt(srow['mean_final_val_loss'], 4)} ({_fmt(srow['sem_final_val_loss'], 4)})", delta, interval, wins))
+    _write_table(GENERATED / "real_lora_rows.md", ("Setting", "Strategy", "Final validation loss (SEM)", "Loss Δ vs uniform", "Bootstrap 95% CI", "Wins"), rows)
 
 
 def make_transformer_publication_figure() -> None:
@@ -776,20 +698,16 @@ def make_transformer_publication_figure() -> None:
         rotation=35,
         ha="right",
     )
-    ax.set_ylabel(r"loss $\Delta$: soft dimension $-$ exact uniform")
-    ax.set_title("Confirmatory transformer run deltas")
+    ax.set_ylabel("validation loss difference")
+    ax.set_title("Primary transformer run deltas")
     ax.legend(fontsize=7, ncol=2)
-    _save(fig, FIGURES / "transformer_primary_run_deltas.pdf")
+    _save(fig, FIGURES / "transformer_primary_run_deltas.png")
 
 
 def _save(fig: plt.Figure, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
-    fig.savefig(
-        path,
-        bbox_inches="tight",
-        metadata={"CreationDate": None, "ModDate": None},
-    )
+    fig.savefig(path, bbox_inches="tight", dpi=200, metadata={"Software": "early-gradient-spectra-lora"})
     plt.close(fig)
 
 
@@ -824,18 +742,18 @@ def make_bbp_figures() -> None:
 
     fig, ax = plt.subplots(figsize=(3.3, 2.4))
     ax.errorbar(g["theta"], g["overlap_mean"], yerr=g["overlap_sem"], marker="o", linewidth=1)
-    ax.set_xlabel(r"spike strength $\theta$")
+    ax.set_xlabel("spike strength θ")
     ax.set_ylabel("mean singular-vector overlap")
     ax.set_title("BBP alignment")
-    _save(fig, FIGURES / "bbp_alignment_summary.pdf")
+    _save(fig, FIGURES / "bbp_alignment_summary.png")
 
     fig, ax = plt.subplots(figsize=(3.3, 2.4))
     ax.errorbar(g["theta"], g["top_sv_mean"], yerr=g["top_sv_sem"], marker="o", linewidth=1)
     ax.plot(g["theta"], g["edge"], linestyle="--", linewidth=1)
-    ax.set_xlabel(r"spike strength $\theta$")
+    ax.set_xlabel("spike strength θ")
     ax.set_ylabel("top singular value")
     ax.set_title("BBP top singular value")
-    _save(fig, FIGURES / "bbp_top_sv_summary.pdf")
+    _save(fig, FIGURES / "bbp_top_sv_summary.png")
 
 
 def make_lora_rank_figures() -> None:
@@ -853,7 +771,7 @@ def make_lora_rank_figures() -> None:
     ax.set_xlabel("nominal LoRA rank")
     ax.set_ylabel("validation MSE")
     ax.set_title("Clean rank sweep")
-    _save(fig, FIGURES / "lora_rank_clean_val_loss.pdf")
+    _save(fig, FIGURES / "lora_rank_clean_val_loss.png")
 
     fig, ax = plt.subplots(figsize=(3.3, 2.4))
     ax.plot(g["rank"], g["det"], marker="o", linewidth=1, label="detectable")
@@ -864,7 +782,7 @@ def make_lora_rank_figures() -> None:
     ax.set_ylabel("final adapter statistic")
     ax.set_title("Final adapter spectra")
     ax.legend(fontsize=7)
-    _save(fig, FIGURES / "lora_rank_clean_spectral_stats.pdf")
+    _save(fig, FIGURES / "lora_rank_clean_spectral_stats.png")
 
 
 def make_alpha_figure() -> None:
@@ -879,11 +797,11 @@ def make_alpha_figure() -> None:
     ax2 = ax.twinx()
     ax2.plot(g["alpha"], g["drift"], marker="s", linewidth=1, label="drift")
     ax.set_xscale("log", base=2)
-    ax.set_xlabel(r"LoRA $\alpha$")
+    ax.set_xlabel("LoRA α")
     ax.set_ylabel("validation MSE")
     ax2.set_ylabel("output drift proxy")
     ax.set_title("Alpha controls fit and drift")
-    _save(fig, FIGURES / "alpha_noise_tradeoff.pdf")
+    _save(fig, FIGURES / "alpha_noise_tradeoff.png")
 
 
 def make_merge_figure() -> None:
@@ -899,7 +817,7 @@ def make_merge_figure() -> None:
     ax.set_xlabel("signed conflict score")
     ax.set_ylabel("merge degradation")
     ax.set_title("Signed conflict predicts merge loss")
-    _save(fig, FIGURES / "merge_conflict_score.pdf")
+    _save(fig, FIGURES / "merge_conflict_score.png")
 
 
 def make_stage4_figure() -> None:
@@ -917,15 +835,31 @@ def make_stage4_figure() -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=25, ha="right")
     ax.set_ylim(0, 1.0)
-    ax.set_ylabel(r"mean $R^2$")
+    ax.set_ylabel("mean in-sample R²")
     ax.set_title("Stage4 effective-rank prediction")
     ax.legend(fontsize=7)
-    _save(fig, FIGURES / "stage4_effective_rank_r2.pdf")
+    _save(fig, FIGURES / "stage4_effective_rank_r2.png")
+
+
+def refresh_report_tables() -> None:
+    """Refresh only marked tables; narrative and equations are authored Markdown."""
+    report = PAPER / "paper.md"
+    text = report.read_text(encoding="utf-8")
+    for name in ("stage4_rows", "transformer_primary_rows", "transformer_scaling_rows", "transformer_sitewise_rows", "real_lora_rows"):
+        start = f"<!-- generated-table: {name}.md -->"
+        end = f"<!-- end-generated-table: {name}.md -->"
+        if text.count(start) != 1 or text.count(end) != 1:
+            raise ValueError(f"missing or repeated generated-table markers: {name}")
+        before, tail = text.split(start, 1)
+        _, after = tail.split(end, 1)
+        table = (GENERATED / f"{name}.md").read_text(encoding="utf-8").strip()
+        text = before + start + "\n" + table + "\n" + end + after
+    report.write_text(text, encoding="utf-8")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Validate or regenerate paper-facing tables and vector figures."
+        description="Validate or regenerate paper-facing Markdown tables and PNG figures."
     )
     parser.add_argument(
         "--validate-only",
@@ -944,13 +878,14 @@ def main() -> None:
     make_stage4_rows()
     make_transformer_publication_rows()
     make_real_lora_publication_rows()
+    refresh_report_tables()
     make_bbp_figures()
     make_lora_rank_figures()
     make_alpha_figure()
     make_merge_figure()
     make_stage4_figure()
     make_transformer_publication_figure()
-    print("wrote validated paper tables and deterministic Type-42 PDF figures")
+    print("wrote validated Markdown tables and PNG figures")
 
 
 if __name__ == "__main__":

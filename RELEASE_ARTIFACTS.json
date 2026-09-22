@@ -1,11 +1,6 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "scientific_source_commit": "bbfa459a4ceca34abac2dba3d522eaab970b9f2e",
-  "paper": {
-    "path": "paper.pdf",
-    "sha256": "be0942d7840d2e3ea1f2503100c331314d7569a07ed3c7a52eb6b5fb82ec767a",
-    "pages": 10
-  },
   "full_releases": [
     {
       "study": "stage4",
@@ -43,16 +38,6 @@
     "sha256": "3479dc2f31c11e0c0bac46e200ac459926ac07deaaa201ac03b342234948a29a",
     "included_in_git": true,
     "large_input_files_included_in_git": false
-  },
-  "publication_build": {
-    "canonical_platform": "linux/amd64",
-    "dockerfile": "Dockerfile.publication",
-    "python_version": "3.12.3",
-    "requirements_lock": "Paper/requirements-publication.lock.txt",
-    "toolchain_lock": "Paper/publication-toolchain.lock.json",
-    "verification_command": "python Paper/verify_publication_reproducibility.py --scope full",
-    "source_date_epoch": 1782123298,
-    "ubuntu_apt_snapshot": "20260622T120000Z"
   },
   "linked_release_artifacts": {
     "schema_version": 1,
@@ -139,5 +124,30 @@
     "data_tar_download_url": "https://zenodo.org/records/21061917/files/zenodo_data_20260626T090248Z.tar?download=1",
     "data_sha256_download_url": "https://zenodo.org/records/21061917/files/zenodo_data_20260626T090248Z.tar.sha256?download=1",
     "commit_identifier": "resolved_by_release_tag"
+  },
+  "historical_publication": {
+    "source_commit": "5bf03dc1c5472b9297208a2df5da8bb44854f5da",
+    "release_tag": "v1.0.4-publication",
+    "paper": {
+      "path": "paper.pdf",
+      "sha256": "be0942d7840d2e3ea1f2503100c331314d7569a07ed3c7a52eb6b5fb82ec767a",
+      "pages": 10
+    },
+    "publication_build": {
+      "canonical_platform": "linux/amd64",
+      "dockerfile": "Dockerfile.publication",
+      "python_version": "3.12.3",
+      "requirements_lock": "Paper/requirements-publication.lock.txt",
+      "toolchain_lock": "Paper/publication-toolchain.lock.json",
+      "verification_command": "python Paper/verify_publication_reproducibility.py --scope full",
+      "source_date_epoch": 1782123298,
+      "ubuntu_apt_snapshot": "20260622T120000Z"
+    }
+  },
+  "current_report": {
+    "path": "Paper/paper.md",
+    "format": "Markdown",
+    "status": "research checkpoint; cleanup is not a new release",
+    "verification_command": "python verify.py"
   }
 }

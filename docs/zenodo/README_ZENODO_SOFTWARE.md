@@ -1,29 +1,11 @@
-# Zenodo software record
+# Software archive record
 
-This record should archive the final tagged software release.
+The recorded historical software release is
+[v1.0.4-publication](https://github.com/GoGoKo699/early-gradient-spectra-lora/releases/tag/v1.0.4-publication).
+A new software archive should be built from an explicitly selected Git commit
+or tag and include the code, Markdown report, compact evidence, checksums,
+licenses, and citation metadata.
 
-Recommended contents:
-
-```text
-lora-project-software-v1.0.0.zip
-paper.pdf
-SHA256SUMS.txt
-README_ZENODO_SOFTWARE.md
-LICENSE
-CITATION.cff
-THIRD_PARTY_NOTICES.md
-```
-
-Build the ZIP from the final `Publication/GitHub` tag, not from the
-`Lora_Project` mother workspace.
-
-After Zenodo reserves or publishes the DOI, copy the DOI back into:
-
-```text
-README.md
-REPRODUCIBILITY.md
-RELEASE_ARTIFACTS.json
-CITATION.cff
-ARTIFACT_LEDGER.md
-the manuscript reproducibility statement
-```
+The current cleanup creates no new archive, release, or DOI. Any future assigned
+identifier should be reflected consistently in `CITATION.cff`,
+`RELEASE_ARTIFACTS.json`, and the root documentation.
